@@ -45,5 +45,7 @@ test('window.new starts empty instead of inheriting the current folder', async (
   await second.waitForFunction(() => window.__moruTest?.ready() === true)
   expect(await second.evaluate(() => window.__moruTest!.projectRoot())).toBeNull()
   expect(await second.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
+  await expect(second.getByTestId('sidebar')).toHaveCount(0)
+  await expect(page.getByTestId('sidebar')).toBeVisible()
   await app.close()
 })

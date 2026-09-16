@@ -80,3 +80,13 @@ test('sidebar shows file-type badges and its width is draggable and persisted', 
   await expect.poll(() => second.page.evaluate(() => document.querySelector('[data-testid="sidebar"]')!.getBoundingClientRect().width).then(Math.round)).toBe(initial + 60)
   await second.app.close()
 })
+
+test('the folder view only appears once a folder is open', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'moru-ux-'))
+  writeFileSync(join(dir, 'lone.txt'), 'x\n')
+  const { app, page } = await launchApp({ MORU_TEST_OPEN: join(dir, 'lone.txt') })
+  await expect(page.getByTestId('sidebar')).toHaveCount(0)
+  await page.evaluate(() => window.__moruTest!.runCommand('sidebar.toggle'))
+  await expect(page.getByTestId('sidebar')).toHaveCount(0)
+  await app.close()
+})

@@ -91,7 +91,7 @@ export const Sidebar = (props: Props) => {
   ]
 
   return (
-    <Show when={props.ws.state.sidebar.open}>
+    <Show when={props.ws.state.sidebar.open && props.ws.state.projectRoot !== null}>
       <aside class="sidebar" data-testid="sidebar" style={{ flex: `0 0 ${props.ws.state.sidebar.width}px` }}>
         <SplitGutter direction="row" onDrag={(delta) => props.ws.setSidebarWidth(props.ws.state.sidebar.width + delta)} class="sidebar-gutter" />
         <div class="sidebar-header" title={props.ws.state.projectRoot ?? ''}>
