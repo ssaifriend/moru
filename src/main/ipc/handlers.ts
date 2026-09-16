@@ -104,8 +104,8 @@ export const registerHandlers = ({
     session.update(info.windowId, parsed.data, info.window.isDestroyed() ? null : info.window.getBounds())
   })
 
-  handle('window.new', async (_request, { sender }) => {
-    openWindow(windows.bySender(sender)?.projectRoot ?? null)
+  handle('window.new', async () => {
+    openWindow(null)
     return ok(true as const)
   })
 

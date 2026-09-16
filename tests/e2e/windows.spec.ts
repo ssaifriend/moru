@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { resolve } from 'node:path'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { launchApp } from './launch'
 
 const fixture = resolve('tests/e2e/fixtures/ime.ts')
@@ -28,5 +30,20 @@ test('window.new opens a second window whose terminals are isolated', async () =
 
   await page2.close()
   await expect.poll(() => app.windows().length).toBe(1)
+  await app.close()
+})
+
+test('window.new starts empty instead of inheriting the current folder', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'moru-win-'))
+  writeFileSync(join(root, 'a.txt'), 'a\n')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root })
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.projectRoot())).toBe(root)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('window.new'))
+  await expect.poll(() => app.windows().length).toBe(2)
+  const second = app.windows().find((w) => w !== page)!
+  await second.waitForFunction(() => window.__moruTest?.ready() === true)
+  expect(await second.evaluate(() => window.__moruTest!.projectRoot())).toBeNull()
+  expect(await second.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
   await app.close()
 })
