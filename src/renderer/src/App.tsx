@@ -88,6 +88,21 @@ export const App = () => {
     ),
   )
 
+  // macOS drops the IME composition when the native window title changes, so title updates are
+  // debounced and deferred until no composition is in progress.
+  let titleTimer: ReturnType<typeof setTimeout> | null = null
+  const applyTitle = (next: string): void => {
+    if (ws.activeView()?.composing) {
+      titleTimer = setTimeout(() => applyTitle(next), 300)
+      return
+    }
+    if (document.title !== next) document.title = next
+  }
+  const scheduleTitle = (next: string): void => {
+    if (titleTimer) clearTimeout(titleTimer)
+    titleTimer = setTimeout(() => applyTitle(next), 400)
+  }
+
   createEffect(() => {
     const leaf = ws.activeLeaf()
     const tab = leaf.active ? ws.state.tabs[leaf.active] : undefined
@@ -96,7 +111,7 @@ export const App = () => {
       meta ? `${meta.title}${meta.dirty ? ' •' : ''}` : tab?.kind === 'terminal' ? (ws.state.terminals[tab.ptyId]?.title ?? 'Terminal') : tab?.kind === 'search' ? 'Find in Files' : tab?.kind === 'preview' ? 'Preview' : tab?.kind === 'diff' ? tab.title : ''
     const root = ws.state.projectRoot
     const project = root ? root.slice(Math.max(root.lastIndexOf('/'), root.lastIndexOf('\\')) + 1) : null
-    document.title = [name, project ?? 'moru'].filter((part) => part !== '').join(' — ')
+    scheduleTitle([name, project ?? 'moru'].filter((part) => part !== '').join(' — '))
   })
 
   onMount(async () => {

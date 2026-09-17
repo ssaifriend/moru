@@ -34,6 +34,12 @@ export type Palette = {
   readonly link: string
 }
 
+const alpha = (hex: string, a: number): string => {
+  const full = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex.slice(0, 7)
+  const n = Number.parseInt(full.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
+}
+
 const build = (id: string, dark: boolean, p: Palette): Theme => ({
   id,
   dark,
@@ -48,10 +54,11 @@ const build = (id: string, dark: boolean, p: Palette): Theme => ({
         '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
           backgroundColor: p.selection,
         },
-        '.cm-activeLine': { backgroundColor: p.activeLine },
+        // the active line must stay translucent: an opaque background paints over the selection layer
+        '.cm-activeLine': { backgroundColor: alpha(p.fg, dark ? 0.045 : 0.04) },
         '.cm-gutters': { backgroundColor: p.bg, color: p.gutter, borderRight: `1px solid ${p.border}` },
         '.cm-activeLineGutter': { backgroundColor: p.activeLine },
-        '.cm-selectionMatch': { backgroundColor: p.selection },
+        '.cm-selectionMatch': { backgroundColor: alpha(p.cursor, 0.18), outline: `1px solid ${alpha(p.cursor, 0.35)}` },
         '.cm-matchingBracket': { outline: `1px solid ${p.gutter}` },
       },
       { dark },
