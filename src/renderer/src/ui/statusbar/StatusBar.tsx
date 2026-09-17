@@ -121,7 +121,9 @@ export const StatusBar = (props: { ws: Workspace }) => {
           {displayPath()}
         </span>
       </span>
-      <span data-testid="status">{props.ws.state.status}</span>
+      <span class="status-message" data-testid="status" title={props.ws.state.status}>
+        {props.ws.state.status}
+      </span>
       <Show when={open()}>
         <Popup items={items()} onClose={close} />
       </Show>

@@ -35,7 +35,7 @@ import { replaceAllPreserving, replaceNextPreserving } from '../find/replace'
 import { type FindSpec, defaultFindSpec, inSelectionField, setInSelectionRanges } from '../find/state'
 import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
-import { languageById } from '../editor/lang'
+import { basenameOf, languageById } from '../editor/lang'
 import { type Indent, detectIndent } from '../editor/indentDetect'
 import { pathCandidates } from '../editor/pathCandidates'
 import type { PathRef } from '../terminal/links'
@@ -501,7 +501,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         addBufferTab(createBuffer(nextBufferId(), file, stateFor, untitledFormat()))
         void invoke('fs.watch', { path: file.path })
         touchMru(file.path)
-        setState('status', `opened ${file.path}`)
+        setState('status', `opened ${basenameOf(file.path)}`)
         return true
       },
       (error) => {
