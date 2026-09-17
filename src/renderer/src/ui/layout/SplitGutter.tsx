@@ -5,22 +5,31 @@ type Props = {
 }
 
 export const SplitGutter = (props: Props) => {
-  const start = (e: MouseEvent): void => {
+  const start = (e: PointerEvent): void => {
+    if (e.button !== 0) return
     e.preventDefault()
-    let last = props.direction === 'row' ? e.clientX : e.clientY
+    const target = e.currentTarget as HTMLElement
+    const axis = (ev: PointerEvent): number => (props.direction === 'row' ? ev.clientX : ev.clientY)
+    let last = axis(e)
 
-    const move = (ev: MouseEvent): void => {
-      const now = props.direction === 'row' ? ev.clientX : ev.clientY
+    const move = (ev: PointerEvent): void => {
+      const now = axis(ev)
+      if (now === last) return
       props.onDrag(now - last)
       last = now
     }
     const stop = (): void => {
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', stop)
+      target.removeEventListener('pointermove', move)
+      target.removeEventListener('pointerup', stop)
+      target.removeEventListener('pointercancel', stop)
+      document.body.classList.remove('resizing', `resizing-${props.direction}`)
     }
 
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', stop)
+    target.setPointerCapture(e.pointerId)
+    target.addEventListener('pointermove', move)
+    target.addEventListener('pointerup', stop)
+    target.addEventListener('pointercancel', stop)
+    document.body.classList.add('resizing', `resizing-${props.direction}`)
   }
 
   return (
@@ -28,7 +37,7 @@ export const SplitGutter = (props: Props) => {
       class="gutter"
       classList={{ row: props.direction === 'row', col: props.direction === 'col', [props.class ?? '']: props.class !== undefined }}
       data-testid={props.class ?? 'gutter'}
-      onMouseDown={start}
+      onPointerDown={start}
     />
   )
 }
