@@ -31,9 +31,19 @@ export const EditorHost = (props: Props) => {
           const tab = leaf.active ? props.ws.state.tabs[leaf.active] : undefined
           return tab?.kind === 'buffer' ? tab.bufferId : null
         },
-        (bufferId) => {
+        (bufferId, previous) => {
+          if (previous) props.ws.rememberScroll(previous, view.scrollDOM.scrollTop)
           const buffer = bufferId ? props.ws.getBuffer(bufferId) : null
           view.setState(buffer ? buffer.state : emptyState())
+          if (bufferId) {
+            const top = props.ws.scrollOf(bufferId)
+            view.requestMeasure({
+              read: () => null,
+              write: () => {
+                view.scrollDOM.scrollTop = top
+              },
+            })
+          }
         },
       ),
     )

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on as onSignal, onCleanup, onMount } from 'solid-js'
+import { Show, createEffect, createMemo, createSignal, on as onSignal, onCleanup, onMount } from 'solid-js'
 import { R } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
 import { whenContext } from './app/context'
@@ -20,6 +20,7 @@ import { registerUserThemes, themeById } from './theme/themes'
 import { installModifierTracking } from './editor/pathLinks'
 import { PaneView } from './ui/layout/PaneView'
 import { Sidebar } from './ui/sidebar/Sidebar'
+import { SplitGutter } from './ui/layout/SplitGutter'
 import { Palette, type PaletteMode } from './ui/palette/Palette'
 import { StatusBar } from './ui/statusbar/StatusBar'
 
@@ -87,6 +88,17 @@ export const App = () => {
     ),
   )
 
+  createEffect(() => {
+    const leaf = ws.activeLeaf()
+    const tab = leaf.active ? ws.state.tabs[leaf.active] : undefined
+    const meta = tab?.kind === 'buffer' ? ws.state.buffers[tab.bufferId] : undefined
+    const name =
+      meta ? `${meta.title}${meta.dirty ? ' •' : ''}` : tab?.kind === 'terminal' ? (ws.state.terminals[tab.ptyId]?.title ?? 'Terminal') : tab?.kind === 'search' ? 'Find in Files' : tab?.kind === 'preview' ? 'Preview' : tab?.kind === 'diff' ? tab.title : ''
+    const root = ws.state.projectRoot
+    const project = root ? root.slice(Math.max(root.lastIndexOf('/'), root.lastIndexOf('\\')) + 1) : null
+    document.title = [name, project ?? 'moru'].filter((part) => part !== '').join(' — ')
+  })
+
   onMount(async () => {
     const uninstall = installKeymap(window, bindings, registry, context)
     const uninstallModifiers = installModifierTracking(window)
@@ -149,6 +161,9 @@ export const App = () => {
     <div class="app">
       <div class="app-row">
         <Sidebar ws={ws} />
+        <Show when={ws.state.sidebar.open && ws.state.projectRoot !== null}>
+          <SplitGutter direction="row" class="sidebar-gutter" onDrag={(delta) => ws.setSidebarWidth(ws.state.sidebar.width + delta)} />
+        </Show>
         <div class="main-column">
           <div class="workspace">
             <PaneView ws={ws} node={ws.tree} />

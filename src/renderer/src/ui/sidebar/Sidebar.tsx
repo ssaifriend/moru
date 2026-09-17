@@ -4,7 +4,6 @@ import type { Workspace } from '../../app/workspace'
 import { basenameOf } from '../../editor/lang'
 import { Popup, type PopupItem } from '../statusbar/Popup'
 import { FileIcon, FolderIcon } from './icons'
-import { SplitGutter } from '../layout/SplitGutter'
 
 type Props = { readonly ws: Workspace }
 
@@ -93,7 +92,6 @@ export const Sidebar = (props: Props) => {
   return (
     <Show when={props.ws.state.sidebar.open && props.ws.state.projectRoot !== null}>
       <aside class="sidebar" data-testid="sidebar" style={{ flex: `0 0 ${props.ws.state.sidebar.width}px` }}>
-        <SplitGutter direction="row" onDrag={(delta) => props.ws.setSidebarWidth(props.ws.state.sidebar.width + delta)} class="sidebar-gutter" />
         <div class="sidebar-header" title={props.ws.state.projectRoot ?? ''}>
           {props.ws.state.projectRoot ? basenameOf(props.ws.state.projectRoot).toUpperCase() : 'NO FOLDER'}
         </div>

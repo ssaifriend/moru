@@ -116,8 +116,10 @@ export const StatusBar = (props: { ws: Workspace }) => {
       <button class="status-item" data-testid="indent" onClick={toggle('indent')}>
         {indentLabel()}
       </button>
-      <span class="grow status-path" data-testid="path" title={activeMeta()?.path ?? ''}>
-        {displayPath()}
+      <span class="grow status-path" title={activeMeta()?.path ?? ''}>
+        <span class="status-path-text" data-testid="path" dir="ltr">
+          {displayPath()}
+        </span>
       </span>
       <span data-testid="status">{props.ws.state.status}</span>
       <Show when={open()}>

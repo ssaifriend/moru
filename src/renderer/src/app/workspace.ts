@@ -161,6 +161,8 @@ export type Workspace = {
   readonly activeBuffer: () => Buffer | null
   readonly activeView: () => EditorView | null
   readonly registerView: (paneId: PaneId, view: EditorView) => void
+  readonly rememberScroll: (bufferId: BufferId, top: number) => void
+  readonly scrollOf: (bufferId: BufferId) => number
   readonly unregisterView: (paneId: PaneId) => void
   readonly openFile: (path: string) => Promise<boolean>
   readonly newUntitled: () => void
@@ -453,6 +455,12 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
   const activeView = (): EditorView | null => views[state.activePane] ?? null
 
+  let scrollTops: Record<BufferId, number> = {}
+  const rememberScroll = (bufferId: BufferId, top: number): void => {
+    scrollTops = D.set(scrollTops, bufferId, top)
+  }
+  const scrollOf = (bufferId: BufferId): number => scrollTops[bufferId] ?? 0
+
   const focusView = (paneId: PaneId): void => {
     setState('activePane', paneId)
     views[paneId]?.focus()
@@ -571,6 +579,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     if (buffer) dirtySync.changed(dirtyEntry(buffer), false)
     if (buffer?.meta) void invoke('fs.unwatch', { path: buffer.meta.path })
     buffers = D.deleteKey(buffers, tab.bufferId)
+    scrollTops = D.deleteKey(scrollTops, tab.bufferId)
     setTree(removeTab(currentTree, tabId))
     setState(
       produce((s) => {
@@ -1312,7 +1321,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       hash: buffer.meta?.hash ?? null,
       docHash: fnv1a32(doc),
       selection: { anchor: buffer.state.selection.main.anchor, head: buffer.state.selection.main.head },
-      scrollTop: viewShowing(buffer.id)?.scrollDOM.scrollTop ?? 0,
+      scrollTop: viewShowing(buffer.id)?.scrollDOM.scrollTop ?? scrollOf(buffer.id),
       history: json.history ?? null,
       languageId: buffer.languageId,
     }
@@ -1409,6 +1418,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         const text = dirty?.text ?? file.text
         const base = createBuffer(nextBufferId(), file, stateFor, untitledFormat())
         const restored: Buffer = { ...base, state: stateFromSnapshot(text, base.languageId, snap), format: snap.format }
+        rememberScroll(restored.id, snap.scrollTop)
         addBufferTab(restored)
         void invoke('fs.watch', { path: file.path })
         if (dirty && snap.hash !== null && snap.hash !== file.hash) setState('banners', restored.id, { kind: 'external', diskHash: file.hash })
@@ -1735,6 +1745,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     activeLeaf,
     activeBuffer,
     activeView,
+    rememberScroll,
+    scrollOf,
     registerView: (paneId, view) => {
       views = D.set(views, paneId, view)
     },

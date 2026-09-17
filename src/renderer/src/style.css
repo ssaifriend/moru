@@ -137,7 +137,7 @@ body.resizing-col { cursor: row-resize; }
 
 .statusbar .grow { flex: 1 1 auto; text-align: right; opacity: 0.7; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .statusbar .status-path { direction: rtl; }
-.statusbar .status-path > * { direction: ltr; }
+.statusbar .status-path-text { direction: ltr; unicode-bidi: isolate; }
 
 .palette-backdrop {
   position: fixed;
@@ -309,7 +309,6 @@ body.resizing-col { cursor: row-resize; }
   flex-direction: column;
   min-height: 0;
   background: var(--bar);
-  border-right: 1px solid var(--border);
   position: relative;
 }
 
@@ -354,10 +353,8 @@ body.resizing-col { cursor: row-resize; }
   letter-spacing: -0.02em;
 }
 .tree-badge.long { font-size: 6.5px; letter-spacing: -0.04em; }
-.sidebar-gutter { position: absolute; top: 0; right: -5px; width: 9px; height: 100%; background: transparent; z-index: 20; flex: none; }
-.sidebar-gutter::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background 120ms; }
-.sidebar-gutter:hover::after, .sidebar-gutter:active::after, body.resizing-row .sidebar-gutter::after { background: color-mix(in srgb, var(--fg) 45%, transparent); }
-.sidebar-gutter:hover, .sidebar-gutter:active { background: transparent; }
+.sidebar-gutter { flex: 0 0 6px; background: var(--bar); border-right: 1px solid var(--border); }
+.sidebar-gutter:hover, .sidebar-gutter:active, body.resizing-row .sidebar-gutter { background: color-mix(in srgb, var(--fg) 30%, var(--bar)); }
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
 
 .mod-held .cm-path-link { text-decoration: underline; cursor: pointer; }

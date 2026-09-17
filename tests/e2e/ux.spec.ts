@@ -90,3 +90,27 @@ test('the folder view only appears once a folder is open', async () => {
   await expect(page.getByTestId('sidebar')).toHaveCount(0)
   await app.close()
 })
+
+test('each tab keeps its own scroll position and the window title follows the active tab', async () => {
+  const root = project()
+  const long = join(root, 'long.ts')
+  writeFileSync(long, Array.from({ length: 300 }, (_, i) => `const v${i} = ${i}`).join('\n') + '\n')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root, MORU_TEST_OPEN: [long, join(root, 'README.md')].join(process.platform === 'win32' ? ';' : ':') })
+  await expect.poll(() => page.title()).toBe(`README.md — ${root.slice(root.lastIndexOf('/') + 1)}`)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 1))
+  await expect.poll(() => page.title()).toContain('long.ts')
+  await page.evaluate(() => window.__moruTest!.gotoLineTop(200))
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop())).toBeGreaterThan(1000)
+  const scrolled = await page.evaluate(() => window.__moruTest!.scrollTop())
+
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 2))
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop())).toBe(0)
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 1))
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop())).toBe(scrolled)
+
+  await page.evaluate(() => window.__moruTest!.focus())
+  await page.keyboard.type('x')
+  await expect.poll(() => page.title()).toContain('long.ts •')
+  await app.close()
+})
