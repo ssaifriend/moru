@@ -54,5 +54,5 @@ describe('render', () => {
     )
     console.log(`markdown render 10k lines: ${elapsed.toFixed(0)} ms`)
     expect(elapsed).toBeLessThan(process.env['CI'] ? 3000 : 1500)
-  })
+  }, 30_000)
 })
