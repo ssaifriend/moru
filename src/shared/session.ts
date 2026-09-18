@@ -11,6 +11,7 @@ export const BufferTabSnapshot = z.object({
   docHash: z.string(),
   selection: z.object({ anchor: z.number().int().nonnegative(), head: z.number().int().nonnegative() }),
   scrollTop: z.number().nonnegative(),
+  scrollPos: z.number().int().nonnegative().optional(),
   history: z.unknown().nullable(),
   languageId: z.string(),
 })

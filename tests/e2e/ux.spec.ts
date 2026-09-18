@@ -107,7 +107,8 @@ test('each tab keeps its own scroll position and the window title follows the ac
   await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 2))
   await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop())).toBe(0)
   await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 1))
-  await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop())).toBe(scrolled)
+  // restored by top visible line, so allow up to one line of pixel drift
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.scrollTop()).then((v) => Math.abs(v - scrolled) <= 24)).toBe(true)
 
   await page.evaluate(() => window.__moruTest!.focus())
   await page.keyboard.type('x')

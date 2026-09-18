@@ -161,7 +161,7 @@ export type Workspace = {
   readonly activeBuffer: () => Buffer | null
   readonly activeView: () => EditorView | null
   readonly registerView: (paneId: PaneId, view: EditorView) => void
-  readonly rememberScroll: (bufferId: BufferId, top: number) => void
+  readonly rememberScroll: (bufferId: BufferId, pos: number) => void
   readonly scrollOf: (bufferId: BufferId) => number
   readonly unregisterView: (paneId: PaneId) => void
   readonly openFile: (path: string) => Promise<boolean>
@@ -456,8 +456,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
   const activeView = (): EditorView | null => views[state.activePane] ?? null
 
   let scrollTops: Record<BufferId, number> = {}
-  const rememberScroll = (bufferId: BufferId, top: number): void => {
-    scrollTops = D.set(scrollTops, bufferId, top)
+  const rememberScroll = (bufferId: BufferId, pos: number): void => {
+    scrollTops = D.set(scrollTops, bufferId, pos)
   }
   const scrollOf = (bufferId: BufferId): number => scrollTops[bufferId] ?? 0
 
@@ -1321,7 +1321,11 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       hash: buffer.meta?.hash ?? null,
       docHash: fnv1a32(doc),
       selection: { anchor: buffer.state.selection.main.anchor, head: buffer.state.selection.main.head },
-      scrollTop: viewShowing(buffer.id)?.scrollDOM.scrollTop ?? scrollOf(buffer.id),
+      scrollTop: viewShowing(buffer.id)?.scrollDOM.scrollTop ?? 0,
+      scrollPos: (() => {
+        const view = viewShowing(buffer.id)
+        return view ? (view.scrollDOM.scrollTop > 0 ? view.lineBlockAtHeight(view.scrollDOM.scrollTop).from : 0) : scrollOf(buffer.id)
+      })(),
       history: json.history ?? null,
       languageId: buffer.languageId,
     }
@@ -1418,7 +1422,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         const text = dirty?.text ?? file.text
         const base = createBuffer(nextBufferId(), file, stateFor, untitledFormat())
         const restored: Buffer = { ...base, state: stateFromSnapshot(text, base.languageId, snap), format: snap.format }
-        rememberScroll(restored.id, snap.scrollTop)
+        rememberScroll(restored.id, snap.scrollPos ?? 0)
         addBufferTab(restored)
         void invoke('fs.watch', { path: file.path })
         if (dirty && snap.hash !== null && snap.hash !== file.hash) setState('banners', restored.id, { kind: 'external', diskHash: file.hash })

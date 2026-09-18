@@ -1,10 +1,17 @@
 import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
 import { createEffect, on, onCleanup, onMount } from 'solid-js'
 import type { Workspace } from '../../app/workspace'
 import { createView } from '../../editor/createEditor'
 import type { PaneLeaf } from '../layout/paneTree'
 
 type Props = { readonly ws: Workspace; readonly leaf: () => PaneLeaf }
+
+export const topPositionOf = (view: EditorView): number => {
+  const scrollTop = view.scrollDOM.scrollTop
+  if (scrollTop <= 0) return 0
+  return view.lineBlockAtHeight(scrollTop).from
+}
 
 const emptyState = (): EditorState => EditorState.create({ doc: '', extensions: [EditorState.readOnly.of(true)] })
 
@@ -32,17 +39,14 @@ export const EditorHost = (props: Props) => {
           return tab?.kind === 'buffer' ? tab.bufferId : null
         },
         (bufferId, previous) => {
-          if (previous) props.ws.rememberScroll(previous, view.scrollDOM.scrollTop)
+          if (previous) props.ws.rememberScroll(previous, topPositionOf(view))
           const buffer = bufferId ? props.ws.getBuffer(bufferId) : null
           view.setState(buffer ? buffer.state : emptyState())
           if (bufferId) {
-            const top = props.ws.scrollOf(bufferId)
-            view.requestMeasure({
-              read: () => null,
-              write: () => {
-                view.scrollDOM.scrollTop = top
-              },
-            })
+            // restore by document position, not pixels: CodeMirror re-anchors the scroller while it
+            // measures line heights after setState, so a raw scrollTop write drifts
+            const pos = Math.min(props.ws.scrollOf(bufferId), view.state.doc.length)
+            view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'start' }) })
           }
         },
       ),
