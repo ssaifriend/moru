@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { launchApp } from './launch'
 
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
@@ -96,7 +96,7 @@ test('each tab keeps its own scroll position and the window title follows the ac
   const long = join(root, 'long.ts')
   writeFileSync(long, Array.from({ length: 300 }, (_, i) => `const v${i} = ${i}`).join('\n') + '\n')
   const { app, page } = await launchApp({ MORU_TEST_ROOT: root, MORU_TEST_OPEN: [long, join(root, 'README.md')].join(process.platform === 'win32' ? ';' : ':') })
-  await expect.poll(() => page.title()).toBe(`README.md — ${root.slice(root.lastIndexOf('/') + 1)}`)
+  await expect.poll(() => page.title()).toBe(`README.md — ${basename(root)}`)
 
   await page.evaluate(() => window.__moruTest!.runCommand('tab.select', 1))
   await expect.poll(() => page.title()).toContain('long.ts')
