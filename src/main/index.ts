@@ -87,6 +87,9 @@ app.whenReady().then(async () => {
   const expected = createExpectedWrites()
   const watch = createWatchService({ subscribe: watcher.subscribe, push: pushToAll, expected })
   app.on('before-quit', () => {
+    // a quit that stalls (e.g. a conpty that refuses to die on Windows) must still end the process;
+    // session and dirty state were flushed before this point
+    setTimeout(() => app.exit(0), 5000).unref()
     ptyManager.disposeAll()
     void watch.dispose()
     void index.dispose()

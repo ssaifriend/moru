@@ -11,7 +11,15 @@ test.afterEach(async () => {
   const leaked = [...launched]
   launched.clear()
   await Promise.all(
-    leaked.map((app) => Promise.race([app.close().catch(() => undefined), new Promise((r) => setTimeout(r, 5000))])),
+    leaked.map((app) =>
+      Promise.race([
+        app.close().catch(() => undefined),
+        new Promise((r) => setTimeout(r, 5000)).then(() => {
+          // a quit that hangs (seen on Windows CI with a live conpty) must not stall the worker
+          app.process().kill()
+        }),
+      ]),
+    ),
   )
 })
 
