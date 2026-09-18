@@ -1,5 +1,9 @@
-nodeLinker: hoisted
 allowBuilds:
   electron: true
   esbuild: true
   node-pty: true
+
+nodeLinker: hoisted
+
+patchedDependencies:
+  '@xterm/xterm@6.0.0': patches/@xterm__xterm@6.0.0.patch

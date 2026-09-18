@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@xterm/xterm@6.0.0':
+    hash: b6659eaf98645ce4a16e64482bf1d9ed814ad59e4849875c76391bbe6178b15e
+    path: patches/@xterm__xterm@6.0.0.patch
+
 importers:
 
   .:
@@ -97,7 +102,7 @@ importers:
         version: 0.19.0
       '@xterm/xterm':
         specifier: 6.0.0
-        version: 6.0.0
+        version: 6.0.0(patch_hash=b6659eaf98645ce4a16e64482bf1d9ed814ad59e4849875c76391bbe6178b15e)
       chardet:
         specifier: 2.2.0
         version: 2.2.0
@@ -3740,7 +3745,7 @@ snapshots:
 
   '@xterm/addon-webgl@0.19.0': {}
 
-  '@xterm/xterm@6.0.0': {}
+  '@xterm/xterm@6.0.0(patch_hash=b6659eaf98645ce4a16e64482bf1d9ed814ad59e4849875c76391bbe6178b15e)': {}
 
   abbrev@4.0.0: {}
 
