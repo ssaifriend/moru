@@ -44,8 +44,8 @@ export const App = () => {
   const ws = createWorkspace({
     settings: settingsStore.settings,
     dirtySync,
-    confirmClose: async (title): Promise<CloseChoice> => {
-      const result = await invoke('dialog.confirmClose', { title })
+    confirmClose: async (title, kind = 'buffer'): Promise<CloseChoice> => {
+      const result = await invoke('dialog.confirmClose', { title, kind })
       return R.match(
         result,
         (r) => r.choice,

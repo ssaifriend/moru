@@ -237,7 +237,7 @@ export type Workspace = {
 }
 
 type Deps = {
-  readonly confirmClose: (title: string) => Promise<CloseChoice>
+  readonly confirmClose: (title: string, kind?: 'buffer' | 'terminal') => Promise<CloseChoice>
   readonly settings: Accessor<Settings>
   readonly dirtySync: DirtySync
 }
@@ -676,7 +676,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     if (tab.kind === 'terminal') {
       const term = state.terminals[tab.ptyId]
       if (term?.alive) {
-        const choice = await confirmClose(term.title)
+        const choice = await confirmClose(term.title, 'terminal')
         if (choice === 'cancel') return
       }
       dropTab(tab.id)

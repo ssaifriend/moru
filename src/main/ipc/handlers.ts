@@ -172,8 +172,23 @@ export const registerHandlers = ({
     return ok({ path })
   })
 
-  handle('dialog.confirmClose', async ({ title }) => {
-    if (isTest) return ok({ choice: CloseChoice.parse(process.env['MORU_TEST_CONFIRM'] ?? 'dontSave') })
+  handle('dialog.confirmClose', async ({ title, kind }) => {
+    if (isTest) {
+      const stub = CloseChoice.parse(process.env['MORU_TEST_CONFIRM'] ?? 'dontSave')
+      return ok({ choice: kind === 'terminal' && stub === 'save' ? 'dontSave' : stub })
+    }
+
+    if (kind === 'terminal') {
+      const { response } = await dialog.showMessageBox({
+        type: 'question',
+        message: `${title} is still running.`,
+        detail: 'Closing the tab will end the shell and any process inside it.',
+        buttons: ['Close Terminal', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      return ok({ choice: response === 0 ? 'dontSave' : 'cancel' })
+    }
 
     const { response } = await dialog.showMessageBox({
       type: 'warning',

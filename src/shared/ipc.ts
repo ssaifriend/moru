@@ -153,7 +153,7 @@ export const contracts = {
   'dialog.openFile': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.saveFile': { request: z.string().nullable(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.confirmClose': {
-    request: z.object({ title: z.string() }),
+    request: z.object({ title: z.string(), kind: z.enum(['buffer', 'terminal']).default('buffer') }),
     response: ipcResult(z.object({ choice: CloseChoice }), UnexpectedError),
   },
   'config.get': { request: z.undefined(), response: ipcResult(ConfigSnapshot, UnexpectedError) },
