@@ -40,6 +40,8 @@ export type IndexService = {
   readonly build: (root: string) => Promise<{ files: number; truncated: boolean }>
   readonly query: (text: string, limit: number) => Promise<IndexItem[]>
   readonly root: () => string | null
+  readonly size: () => number
+  readonly truncated: () => boolean
   readonly dispose: () => Promise<void>
 }
 
@@ -49,11 +51,13 @@ export const createIndexService = ({ rgPath, subscribe, push, debounceMs = 500 }
   let subscription: AsyncSubscription | null = null
   let timer: NodeJS.Timeout | null = null
   let building: Promise<unknown> = Promise.resolve()
+  let lastTruncated = false
 
   const rebuild = async (): Promise<{ files: number; truncated: boolean }> => {
     if (!root) return { files: 0, truncated: false }
     const { files, truncated } = await listFiles(root, rgPath)
     matcher = createMatcher(files, root)
+    lastTruncated = truncated
     return { files: files.length, truncated }
   }
 
@@ -86,6 +90,8 @@ export const createIndexService = ({ rgPath, subscribe, push, debounceMs = 500 }
       return matcher?.query(text, limit) ?? []
     },
     root: () => root,
+    size: () => matcher?.size ?? 0,
+    truncated: () => lastTruncated,
     dispose: async () => {
       if (timer) clearTimeout(timer)
       await subscription?.unsubscribe()

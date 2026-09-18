@@ -10,7 +10,7 @@ import { createFile, renamePath, trashPath } from '../fs/ops'
 import { readTextFile } from '../fs/read'
 import { listDirectory } from '../fs/tree'
 import { writeHtml, writePdf } from '../preview/export'
-import type { IndexService } from '../index/service'
+import type { IndexRegistry } from '../index/registry'
 import type { ReplaceService } from '../search/replace'
 import type { SearchService } from '../search/run'
 import { writeTextFile } from '../fs/write'
@@ -37,7 +37,7 @@ export type HandlerDeps = {
   readonly windows: WindowRegistry
   readonly openWindow: (projectRoot: string | null) => void
   readonly session: SessionStore
-  readonly index: IndexService
+  readonly index: IndexRegistry
   readonly search: SearchService
   readonly replace: ReplaceService
 }
@@ -73,10 +73,10 @@ export const registerHandlers = ({
 
   handle('index.build', async ({ root }, { sender }) => {
     windows.setRoot(sender, root)
-    return ok(await index.build(root))
+    return ok(await index.build(sender, root))
   })
 
-  handle('index.query', async ({ text, limit }) => ok({ items: await index.query(text, limit) }))
+  handle('index.query', async ({ text, limit }, { sender }) => ok({ items: await index.query(sender, text, limit) }))
 
   handle('search.run', async ({ id, spec, roots }) => {
     search.run(id, spec, roots)

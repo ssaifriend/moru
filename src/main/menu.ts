@@ -4,12 +4,18 @@ import { pushToAll } from './ipc/push'
 import { pushTo } from './windows'
 import { editorContextMenu } from './menu/context'
 
+const runInFocusedWindow = (id: string): void => {
+  const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (target) pushTo(target.webContents, 'command.run', { id })
+  else pushToAll('command.run', { id })
+}
+
 const command = (label: string, id: string, accelerator?: string): MenuItemConstructorOptions => ({
   id,
   label,
   accelerator,
   registerAccelerator: false,
-  click: () => pushToAll('command.run', { id }),
+  click: () => runInFocusedWindow(id),
 })
 
 export const installMenu = (): void => {

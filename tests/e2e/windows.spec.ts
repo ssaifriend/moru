@@ -49,3 +49,26 @@ test('window.new starts empty instead of inheriting the current folder', async (
   await expect(page.getByTestId('sidebar')).toBeVisible()
   await app.close()
 })
+
+test('each window has its own folder and Goto index', async () => {
+  const rootA = mkdtempSync(join(tmpdir(), 'moru-win-a-'))
+  const rootB = mkdtempSync(join(tmpdir(), 'moru-win-b-'))
+  writeFileSync(join(rootA, 'alpha.ts'), 'a\n')
+  writeFileSync(join(rootB, 'beta.ts'), 'b\n')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: rootA })
+  await page.evaluate(() => window.__moruTest!.runCommand('window.new'))
+  await expect.poll(() => app.windows().length).toBe(2)
+  const second = app.windows().find((w) => w !== page)!
+  await second.waitForFunction(() => window.__moruTest?.ready() === true)
+  await second.evaluate((r) => window.__moruTest!.setProjectRoot(r), rootB)
+
+  expect(await page.evaluate(() => window.__moruTest!.projectRoot())).toBe(rootA)
+  expect(await second.evaluate(() => window.__moruTest!.projectRoot())).toBe(rootB)
+  const query = (w: typeof page, text: string) =>
+    w.evaluate((t) => (window as unknown as { moru: { invoke: (c: string, p: unknown) => Promise<{ value?: { items: { rel: string }[] } }> } }).moru.invoke('index.query', { text: t, limit: 5 }).then((r) => r.value?.items.map((i) => i.rel) ?? []), text)
+  await expect.poll(() => query(page, 'alpha')).toEqual(['alpha.ts'])
+  await expect.poll(() => query(second, 'beta')).toEqual(['beta.ts'])
+  expect(await query(page, 'beta')).toEqual([])
+  expect(await query(second, 'alpha')).toEqual([])
+  await app.close()
+})

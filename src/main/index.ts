@@ -10,7 +10,7 @@ import { channels } from '@shared/channels'
 import type { Bounds, WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
 import { createThemesService } from './config/themes'
-import { createIndexService } from './index/service'
+import { createIndexRegistry } from './index/registry'
 import { createReplaceService } from './search/replace'
 import { createSearchService } from './search/run'
 import { registerHandlers } from './ipc/handlers'
@@ -94,7 +94,7 @@ app.whenReady().then(async () => {
   const windows = createWindowRegistry()
   installAppFileProtocol({ root: () => windows.focusedRoot(), log: (message) => logger.warn(message) })
   const sessionStore = createSessionStore(userData)
-  const index = createIndexService({ rgPath, subscribe: watcher.subscribe, push: pushToAll })
+  const index = createIndexRegistry({ rgPath, subscribe: watcher.subscribe, pushTo })
   const search = createSearchService({ rgPath, push: pushToAll, settings: () => config.snapshot().settings.search })
   const replace = createReplaceService({ expected })
   app.on('before-quit', () => search.dispose())
@@ -115,6 +115,7 @@ app.whenReady().then(async () => {
     const contents = window.webContents
     window.on('closed', () => {
       ptyManager.killOwnedBy(contents)
+      void index.release(contents)
       windows.remove(info.windowId)
       if (!quitting) sessionStore.remove(info.windowId)
     })

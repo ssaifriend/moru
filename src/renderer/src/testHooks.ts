@@ -42,6 +42,7 @@ export type MoruTestHooks = {
   terminalFocus(): void
   setSelection(from: number, to: number): void
   projectRoot(): string | null
+  setProjectRoot(path: string | null): Promise<void>
   bannerKind(): string | null
   windowId(): string
   snapshotNow(): unknown
@@ -149,6 +150,7 @@ export const installTestHooks = (
     },
     setSelection: (from, to) => view().dispatch({ selection: { anchor: from, head: to } }),
     projectRoot: () => ws.state.projectRoot,
+    setProjectRoot: (path) => ws.setProjectRoot(path),
     windowId: () => ws.state.windowId,
     snapshotNow: () => ws.snapshot(),
     findHistory: () => [...ws.state.find.history],
