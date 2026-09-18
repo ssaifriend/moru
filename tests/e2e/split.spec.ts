@@ -46,3 +46,20 @@ test('split down nests a column split and closing the pane collapses it', async 
 
   await app.close()
 })
+
+test('the split gutter resizes panes while the mouse drifts off it', async () => {
+  const { app, page } = await launchApp()
+  await page.evaluate(() => window.__moruTest!.runCommand('view.splitRight'))
+  await page.waitForTimeout(300)
+  const widths = () => page.evaluate(() => Array.from(document.querySelectorAll('.pane')).map((p) => Math.round(p.getBoundingClientRect().width)))
+  const before = await widths()
+  const box = (await page.locator('.split .gutter.row').first().boundingBox())!
+  await page.mouse.move(box.x + 3, box.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 3 + 120, box.y + 260, { steps: 12 })
+  await page.mouse.up()
+  const after = await widths()
+  expect(after[0]! - before[0]!).toBeGreaterThan(100)
+  expect(await page.locator('.drag-overlay').count()).toBe(0)
+  await app.close()
+})

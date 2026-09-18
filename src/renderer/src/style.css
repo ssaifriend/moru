@@ -77,6 +77,9 @@ html, body, #root {
 .gutter:hover, .gutter:active { background: color-mix(in srgb, var(--fg) 30%, var(--bar)); }
 
 body.resizing { user-select: none; }
+.drag-overlay { position: fixed; inset: 0; z-index: 9999; background: transparent; }
+.drag-overlay.row { cursor: col-resize; }
+.drag-overlay.col { cursor: row-resize; }
 body.resizing * { cursor: inherit !important; }
 body.resizing-row { cursor: col-resize; }
 body.resizing-col { cursor: row-resize; }
