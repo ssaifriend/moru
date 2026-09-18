@@ -4,7 +4,7 @@
   "private": true,
   "description": "Personal text editor: Sublime Text feel plus an agent terminal",
   "author": "Jinseong Park",
-  "homepage": "https://github.com/ssaifriend/text-editor",
+  "homepage": "https://github.com/ssaifriend/moru",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
