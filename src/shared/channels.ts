@@ -12,6 +12,9 @@ export const channels = {
   dialogOpenFolder: 'dialog.openFolder',
   windowNew: 'window.new',
   windowDetach: 'window.detach',
+  windowDetachCommit: 'window.detachCommit',
+  windowDetachCancel: 'window.detachCancel',
+  windowDetachMove: 'window.detachMove',
   sessionLoad: 'session.load',
   indexBuild: 'index.build',
   indexQuery: 'index.query',
@@ -55,7 +58,14 @@ export const channels = {
 
 export type Channel = (typeof channels)[keyof typeof channels]
 
-export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channels.logWrite, channels.ptyAck, channels.sessionSave, channels.menuContext]
+export const sendChannels: readonly Channel[] = [
+  channels.perfFirstPaint,
+  channels.logWrite,
+  channels.ptyAck,
+  channels.sessionSave,
+  channels.menuContext,
+  channels.windowDetachMove,
+]
 
 export const pushChannels: readonly Channel[] = [
   channels.configChanged,

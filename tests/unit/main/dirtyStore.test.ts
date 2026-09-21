@@ -45,3 +45,17 @@ describe('dirty store', () => {
     await expect(store.clear('nope')).resolves.toBeUndefined()
   })
 })
+
+describe('clearWindow', () => {
+  it('removes only the entries prefixed by that window id', async () => {
+    const store = createDirtyStore(dir)
+    await store.write({ ...entry, id: 'w3:b1' })
+    await store.write({ ...entry, id: 'w3:b2' })
+    await store.write({ ...entry, id: 'w30:b1' })
+    await store.write({ ...entry, id: 'handoff:w3:b1:1' })
+
+    await store.clearWindow('w3')
+
+    expect((await store.list()).map((e) => e.id).sort()).toEqual(['handoff:w3:b1:1', 'w30:b1'])
+  })
+})

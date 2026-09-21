@@ -4,7 +4,7 @@ import { ThemesSnapshot } from './theme'
 import { ConfigSnapshot } from './config'
 import { encodingNames, eolNames } from './encoding'
 import { KeymapSnapshot } from './keymapFile'
-import { SessionFile, WindowSnapshot } from './session'
+import { Bounds, SessionFile, WindowSnapshot } from './session'
 
 const ipcResult = <T extends z.ZodType, E extends z.ZodType>(value: T, error: E) =>
   z.discriminatedUnion('ok', [
@@ -128,9 +128,11 @@ export const contracts = {
   'dialog.openFolder': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'window.new': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
   'window.detach': {
-    request: z.object({ snapshot: WindowSnapshot, at: ScreenPoint.nullable() }),
-    response: ipcResult(z.literal(true), UnexpectedError),
+    request: z.object({ snapshot: WindowSnapshot, bounds: Bounds, live: z.boolean() }),
+    response: ipcResult(z.object({ windowId: z.string() }), UnexpectedError),
   },
+  'window.detachCommit': { request: z.undefined(), response: ipcResult(z.object({ committed: z.boolean() }), UnexpectedError) },
+  'window.detachCancel': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
   'index.build': {
     request: z.object({ root: z.string() }),
     response: ipcResult(z.object({ files: z.number().int(), truncated: z.boolean() }), UnexpectedError),

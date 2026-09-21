@@ -1,10 +1,10 @@
 import { existsSync, statSync } from 'node:fs'
-import { dialog, ipcMain, screen } from 'electron'
+import { dialog, ipcMain } from 'electron'
 import { channels } from '@shared/channels'
-import { CloseChoice, ContextMenuRequest, PtyAck } from '@shared/ipc'
+import { CloseChoice, ContextMenuRequest, PtyAck, ScreenPoint } from '@shared/ipc'
 import { WindowSnapshot } from '@shared/session'
 import { ok } from '@shared/result'
-import { detachedBounds } from '../detachBounds'
+import type { TearOffService } from '../tearOff'
 import type { ConfigService, KeymapService } from '../config/service'
 import type { ThemesService } from '../config/themes'
 import { createFile, renamePath, trashPath } from '../fs/ops'
@@ -37,6 +37,7 @@ export type HandlerDeps = {
   readonly home: string
   readonly windows: WindowRegistry
   readonly openWindow: (options: OpenWindowOptions) => void
+  readonly tearOff: TearOffService
   readonly session: SessionStore
   readonly index: IndexRegistry
   readonly search: SearchService
@@ -54,6 +55,7 @@ export const registerHandlers = ({
   home,
   windows,
   openWindow,
+  tearOff,
   session,
   index,
   search,
@@ -111,10 +113,15 @@ export const registerHandlers = ({
     return ok(true as const)
   })
 
-  handle('window.detach', async ({ snapshot, at }) => {
-    const bounds = at ? detachedBounds(at, screen.getDisplayNearestPoint(at).workArea) : null
-    openWindow({ projectRoot: null, session: snapshot, bounds })
+  handle('window.detach', async ({ snapshot, bounds, live }, { sender }) => ok({ windowId: tearOff.start(sender, snapshot, bounds, live) }))
+  handle('window.detachCommit', async (_request, { sender }) => ok({ committed: tearOff.commit(sender) }))
+  handle('window.detachCancel', async (_request, { sender }) => {
+    await tearOff.cancel(sender)
     return ok(true as const)
+  })
+  ipcMain.on(channels.windowDetachMove, (event, raw: unknown) => {
+    const parsed = ScreenPoint.safeParse(raw)
+    if (parsed.success) tearOff.move(event.sender, parsed.data)
   })
 
   handle('fs.tree', ({ dir }) => listDirectory(dir))

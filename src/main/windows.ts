@@ -18,6 +18,7 @@ export type OpenWindowOptions = {
   readonly session?: WindowSnapshot | null
   readonly bounds?: Bounds | null
   readonly recoverDirtyIds?: readonly string[]
+  readonly inactive?: boolean
 }
 
 export type WindowRegistry = {

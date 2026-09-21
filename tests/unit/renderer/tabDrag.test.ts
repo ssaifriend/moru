@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dropIndexAt, droppedOutside } from '@renderer/ui/tabs/tabDrag'
+import { dropIndexAt, insideBy, outsideBy, tornBounds } from '@renderer/ui/tabs/tabDrag'
 
 const tabs = [
   { left: 0, right: 100 },
@@ -22,19 +22,39 @@ describe('dropIndexAt', () => {
   })
 })
 
-describe('droppedOutside', () => {
+describe('window edge hysteresis', () => {
   const win = { x: 100, y: 50, width: 800, height: 600 }
 
-  it('is false anywhere inside the window, edges included', () => {
-    expect(droppedOutside({ x: 100, y: 50 }, win)).toBe(false)
-    expect(droppedOutside({ x: 500, y: 300 }, win)).toBe(false)
-    expect(droppedOutside({ x: 899, y: 649 }, win)).toBe(false)
+  it('outsideBy needs the pointer past the edge by the margin', () => {
+    expect(outsideBy({ x: 95, y: 300 }, win, 6)).toBe(false)
+    expect(outsideBy({ x: 93, y: 300 }, win, 6)).toBe(true)
+    expect(outsideBy({ x: 905, y: 300 }, win, 6)).toBe(false)
+    expect(outsideBy({ x: 906, y: 300 }, win, 6)).toBe(true)
+    expect(outsideBy({ x: 500, y: 656 }, win, 6)).toBe(true)
+    expect(outsideBy({ x: 500, y: 300 }, win, 6)).toBe(false)
   })
 
-  it('is true past any edge', () => {
-    expect(droppedOutside({ x: 99, y: 300 }, win)).toBe(true)
-    expect(droppedOutside({ x: 900, y: 300 }, win)).toBe(true)
-    expect(droppedOutside({ x: 500, y: 49 }, win)).toBe(true)
-    expect(droppedOutside({ x: 500, y: 650 }, win)).toBe(true)
+  it('insideBy needs the pointer inside every edge by the margin', () => {
+    expect(insideBy({ x: 105, y: 300 }, win, 6)).toBe(false)
+    expect(insideBy({ x: 106, y: 300 }, win, 6)).toBe(true)
+    expect(insideBy({ x: 500, y: 644 }, win, 6)).toBe(false)
+    expect(insideBy({ x: 500, y: 643 }, win, 6)).toBe(true)
+  })
+
+  it('leaves a dead band on the frame where neither holds', () => {
+    const onFrame = { x: 100, y: 300 }
+    expect(outsideBy(onFrame, win, 6)).toBe(false)
+    expect(insideBy(onFrame, win, 6)).toBe(false)
+  })
+})
+
+describe('tornBounds', () => {
+  it('offsets the window so the grabbed point of the tab stays under the pointer', () => {
+    expect(tornBounds({ x: 640.4, y: 300.6 }, { x: 30, y: 12 + 28 }, { width: 1200, height: 800 })).toEqual({
+      x: 610,
+      y: 261,
+      width: 1200,
+      height: 800,
+    })
   })
 })

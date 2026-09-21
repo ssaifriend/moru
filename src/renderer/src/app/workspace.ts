@@ -9,9 +9,9 @@ import { createStore, produce, unwrap } from 'solid-js/store'
 import { type Settings, resolveForLanguage } from '@shared/config'
 import type { EncodingName, Eol } from '@shared/encoding'
 import { fnv1a32 } from '@shared/hash'
-import type { DirtyEntry, OpenedFile, SaveError, ScreenPoint, TreeEntry } from '@shared/ipc'
+import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
 import type { ReplaceReport, SearchMatch, SearchSpec } from '@shared/search'
-import { singleTabWindow, type BufferTabSnapshot, type LeafSnapshot, type PaneSnapshot, type PreviewTabSnapshot, type SearchTabSnapshot, type TabSnapshot, type WindowSnapshot } from '@shared/session'
+import { singleTabWindow, type Bounds, type BufferTabSnapshot, type LeafSnapshot, type PaneSnapshot, type PreviewTabSnapshot, type SearchTabSnapshot, type TabSnapshot, type WindowSnapshot } from '@shared/session'
 import {
   type Buffer,
   type BufferId,
@@ -175,7 +175,12 @@ export type Workspace = {
   readonly singlePane: () => void
   readonly moveTabToPane: (tabId: TabId, toPaneId: PaneId, index?: number) => void
   readonly moveActiveTab: (delta: 1 | -1) => void
-  readonly detachTab: (tabId?: TabId, at?: ScreenPoint | null) => Promise<boolean>
+  readonly detachTab: (tabId?: TabId) => Promise<boolean>
+  readonly canDetach: (tabId: TabId) => boolean
+  readonly tearOffStart: (tabId: TabId, bounds: Bounds) => Promise<boolean>
+  readonly tearOffMove: (bounds: Bounds) => void
+  readonly tearOffCommit: (tabId: TabId) => Promise<void>
+  readonly tearOffCancel: () => Promise<void>
   readonly focusPaneIndex: (n: number) => void
   readonly focusPane: (paneId: PaneId) => void
   readonly resizeSplit: (splitId: PaneId, sizes: readonly number[]) => void
@@ -786,40 +791,95 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     moveTabToPane(tabId, fresh)
   }
 
-  const detachTab = async (tabId: TabId | undefined = activeLeaf().active ?? undefined, at: ScreenPoint | null = null): Promise<boolean> => {
-    const tab = tabId ? state.tabs[tabId] : undefined
-    if (!tab) return false
+  const detachableBuffer = (tabId: TabId, explain: boolean): Buffer | null => {
+    const tab = state.tabs[tabId]
+    if (!tab) return null
     if (state.projectRoot !== null) {
-      setState('status', 'tabs stay in a window that has a folder open')
-      return false
+      if (explain) setState('status', 'tabs stay in a window that has a folder open')
+      return null
     }
     if (tab.kind !== 'buffer') {
-      setState('status', 'only editor tabs move to a new window')
-      return false
+      if (explain) setState('status', 'only editor tabs move to a new window')
+      return null
     }
-    const buffer = buffers[tab.bufferId]
-    if (!buffer) return false
+    return buffers[tab.bufferId] ?? null
+  }
 
+  const canDetach = (tabId: TabId): boolean => detachableBuffer(tabId, false) !== null
+
+  // the receiving window restores the tab like a session: snapshot plus a one-off dirty entry for unsaved text
+  const handoffSnapshot = async (buffer: Buffer): Promise<BufferTabSnapshot | null> => {
     const snap: BufferTabSnapshot = { ...bufferSnapshot(buffer), dirtyId: `handoff:${state.windowId}:${buffer.id}:${Date.now()}` }
-    if (buffer.meta === null || isDirty(buffer)) {
-      const written = await invoke('dirty.write', { ...dirtyEntry(buffer), id: snap.dirtyId })
-      if (R.isError(written)) {
-        setState('status', 'could not hand the tab to a new window')
-        return false
-      }
-    }
+    if (buffer.meta !== null && !isDirty(buffer)) return snap
 
-    const opened = await invoke('window.detach', { snapshot: singleTabWindow(snap), at })
-    if (R.isError(opened)) {
-      void invoke('dirty.clear', snap.dirtyId)
-      setState('status', 'could not open a window for the tab')
-      return false
-    }
+    const written = await invoke('dirty.write', { ...dirtyEntry(buffer), id: snap.dirtyId })
+    if (R.isOk(written)) return snap
+    setState('status', 'could not hand the tab to a new window')
+    return null
+  }
 
-    dropTab(tab.id)
+  const openDetached = async (buffer: Buffer, bounds: Bounds, live: boolean): Promise<string | null> => {
+    const snap = await handoffSnapshot(buffer)
+    if (!snap) return null
+
+    const opened = await invoke('window.detach', { snapshot: singleTabWindow(snap), bounds, live })
+    if (R.isOk(opened)) return snap.dirtyId
+    void invoke('dirty.clear', snap.dirtyId)
+    setState('status', 'could not open a window for the tab')
+    return null
+  }
+
+  const detachTab = async (tabId: TabId | undefined = activeLeaf().active ?? undefined): Promise<boolean> => {
+    const buffer = tabId ? detachableBuffer(tabId, true) : null
+    if (!tabId || !buffer) return false
+
+    const bounds = { x: window.screenX + 40, y: window.screenY + 40, width: window.outerWidth, height: window.outerHeight }
+    if (!(await openDetached(buffer, bounds, false))) return false
+
+    dropTab(tabId)
     ensureOneTab()
     return true
   }
+
+  // start / cancel / commit run strictly in call order so a fast leave-enter-leave cannot cross their round trips
+  let tearOffQueue: Promise<unknown> = Promise.resolve()
+  let tearOffHandoff: string | null = null
+
+  const queued = <T>(op: () => Promise<T>): Promise<T> => {
+    const run = tearOffQueue.then(op, op)
+    tearOffQueue = run
+    return run
+  }
+
+  const tearOffStart = (tabId: TabId, bounds: Bounds): Promise<boolean> =>
+    queued(async () => {
+      const buffer = detachableBuffer(tabId, false)
+      if (!buffer) return false
+      tearOffHandoff = await openDetached(buffer, bounds, true)
+      return tearOffHandoff !== null
+    })
+
+  const tearOffMove = (bounds: Bounds): void => window.moru.send('window.detachMove', { x: bounds.x, y: bounds.y })
+
+  const tearOffCommit = (tabId: TabId): Promise<void> =>
+    queued(async () => {
+      tearOffHandoff = null
+      const result = await invoke('window.detachCommit', undefined)
+      if (!R.isOk(result) || !R.getExn(result).committed) {
+        setState('status', 'the new window went away; the tab stays here')
+        return
+      }
+      dropTab(tabId)
+      ensureOneTab()
+    })
+
+  const tearOffCancel = (): Promise<void> =>
+    queued(async () => {
+      const handoff = tearOffHandoff
+      tearOffHandoff = null
+      await invoke('window.detachCancel', undefined)
+      if (handoff) void invoke('dirty.clear', handoff)
+    })
 
   const updateActive = (f: (buffer: Buffer) => Buffer): void => {
     const buffer = activeBuffer()
@@ -1844,6 +1904,11 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     moveTabToPane,
     moveActiveTab,
     detachTab,
+    canDetach,
+    tearOffStart,
+    tearOffMove,
+    tearOffCommit,
+    tearOffCancel,
     focusPaneIndex,
     focusPane: focusView,
     resizeSplit: (splitId, sizes) => setTree(resizeSplitTree(currentTree, splitId, sizes)),

@@ -6,7 +6,9 @@ const hidden = process.env['MORU_HIDDEN'] === '1'
 
 export type WindowBounds = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
 
-export const createWindow = (bounds: WindowBounds | null = null): BrowserWindow => {
+export type CreateWindowOptions = { readonly inactive?: boolean }
+
+export const createWindow = (bounds: WindowBounds | null = null, { inactive = false }: CreateWindowOptions = {}): BrowserWindow => {
   const window = new BrowserWindow({
     ...(bounds ?? { width: 1200, height: 800 }),
     show: false,
@@ -20,7 +22,9 @@ export const createWindow = (bounds: WindowBounds | null = null): BrowserWindow 
   })
 
   window.on('ready-to-show', () => {
-    if (!hidden) window.show()
+    if (hidden) return
+    if (inactive) window.showInactive()
+    else window.show()
   })
 
   window.webContents.setWindowOpenHandler(({ url }) => {

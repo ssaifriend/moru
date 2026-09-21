@@ -91,9 +91,15 @@ test('dragging a tab onto another pane moves it there', async () => {
   await page.evaluate(() => window.__moruTest!.runCommand('file.new'))
   await expect.poll(async () => (await panes(page))[1]?.tabs.map((t) => t.title)).toEqual(['untitled'])
 
-  const source = page.locator('.pane').nth(0).locator('.tab', { hasText: 'ime.ts' })
-  const strip = page.locator('.pane').nth(1).locator('.tabs')
-  await source.dragTo(strip, { targetPosition: { x: 300, y: 12 } })
+  const source = (await page.locator('.pane').nth(0).locator('.tab', { hasText: 'ime.ts' }).boundingBox())!
+  const strip = (await page.locator('.pane').nth(1).locator('.tabs').boundingBox())!
+  await page.mouse.move(source.x + 20, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(source.x + 40, source.y + 10, { steps: 3 })
+  await page.mouse.move(strip.x + strip.width - 20, strip.y + strip.height / 2, { steps: 8 })
+  await expect(page.locator('.pane').nth(1)).toHaveClass(/drop-target/)
+  await expect(page.locator('.tab-ghost')).toHaveText('ime.ts')
+  await page.mouse.up()
 
   await expect.poll(async () => (await panes(page))[1]?.tabs.map((t) => t.title)).toEqual(['untitled', 'ime.ts'])
   const after = await panes(page)
@@ -101,6 +107,7 @@ test('dragging a tab onto another pane moves it there', async () => {
   expect(after[1]?.tabs[1]?.active).toBe(true)
   expect(await page.locator('.pane.drop-target').count()).toBe(0)
   expect(await page.locator('.tab.dragging').count()).toBe(0)
+  expect(await page.locator('.tab-ghost').count()).toBe(0)
 
   await app.close()
 })

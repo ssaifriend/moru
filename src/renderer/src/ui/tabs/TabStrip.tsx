@@ -1,11 +1,10 @@
 import { For, Show } from 'solid-js'
 import type { Workspace } from '../../app/workspace'
 import type { PaneLeaf } from '../layout/paneTree'
-import { beginTabDrag, draggingTab, dropTarget, droppedOutside, endTabDrag, tabMime } from './tabDrag'
+import { draggingTab, dropTarget } from './tabDrag'
+import { beginTabPointerDrag } from './tabDragController'
 
 type Props = { readonly ws: Workspace; readonly leaf: () => PaneLeaf }
-
-const windowRect = () => ({ x: window.screenX, y: window.screenY, width: window.outerWidth, height: window.outerHeight })
 
 export const TabStrip = (props: Props) => {
   const dropIndex = () => {
@@ -33,11 +32,14 @@ export const TabStrip = (props: Props) => {
             }
             return meta()?.title ?? ''
           }
+          const grab = (e: MouseEvent): void => {
+            if (e.button !== 0 || (e.target instanceof Element && e.target.closest('.tab-close'))) return
+            beginTabPointerDrag(props.ws, e, { tabId, paneId: props.leaf().id, title: title() }, (e.currentTarget as HTMLElement).getBoundingClientRect())
+          }
           return (
             <div
               class="tab"
               role="tab"
-              draggable={true}
               classList={{
                 active: props.leaf().active === tabId,
                 dirty: meta()?.dirty ?? false,
@@ -46,22 +48,11 @@ export const TabStrip = (props: Props) => {
                 'drop-before': dropIndex() === index(),
               }}
               title={meta()?.path ?? title()}
+              onPointerDown={grab}
               onMouseDown={(e) => {
                 if (e.button === 1) void props.ws.closeTab(tabId)
                 else props.ws.activateTab(props.leaf().id, tabId)
-              }}
-              onDragStart={(e) => {
-                if (!e.dataTransfer) return
-                e.dataTransfer.setData(tabMime, tabId)
-                e.dataTransfer.effectAllowed = 'move'
-                beginTabDrag({ tabId, fromPaneId: props.leaf().id })
-              }}
-              onDragEnd={(e) => {
-                const drag = draggingTab()
-                endTabDrag()
-                if (!drag || e.dataTransfer?.dropEffect !== 'none') return
-                const at = { x: e.screenX, y: e.screenY }
-                if (droppedOutside(at, windowRect())) void props.ws.detachTab(drag.tabId, at)
+                grab(e)
               }}
             >
               <span class="tab-title">{title()}</span>

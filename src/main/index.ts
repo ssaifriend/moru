@@ -27,7 +27,8 @@ import { createSessionStore } from './session/sessionStore'
 import { createExpectedWrites } from './watch/expected'
 import { createWatchService } from './watch/service'
 import { createWindow } from './window'
-import { createWindowRegistry, pushTo, type OpenWindowOptions } from './windows'
+import { createWindowRegistry, pushTo, type OpenWindowOptions, type WindowInfo } from './windows'
+import { createTearOffService } from './tearOff'
 import type { DirtyStore } from './session/dirtyStore'
 
 const isTest = process.env['MORU_TEST'] === '1'
@@ -115,8 +116,8 @@ app.whenReady().then(async () => {
     quitting = true
   })
 
-  const openWindow = ({ paths = [], projectRoot, session = null, bounds = null, recoverDirtyIds = [] }: OpenWindowOptions): BrowserWindow => {
-    const window = createWindow(bounds)
+  const openWindow = ({ paths = [], projectRoot, session = null, bounds = null, recoverDirtyIds = [], inactive = false }: OpenWindowOptions): WindowInfo => {
+    const window = createWindow(bounds, { inactive })
     const info = windows.add({ window, startupPaths: paths, projectRoot, session, recoverDirtyIds })
     const contents = window.webContents
     window.on('closed', () => {
@@ -125,8 +126,9 @@ app.whenReady().then(async () => {
       windows.remove(info.windowId)
       if (!quitting) sessionStore.remove(info.windowId)
     })
-    return window
+    return info
   }
+  const tearOff = createTearOffService({ openWindow, clearDirty: dirty.clearWindow })
 
   registerHandlers({
     config,
@@ -139,6 +141,7 @@ app.whenReady().then(async () => {
     home: app.getPath('home'),
     windows,
     openWindow: (options) => void openWindow(options),
+    tearOff,
     session: sessionStore,
     index,
     search,
@@ -163,10 +166,10 @@ app.whenReady().then(async () => {
             bounds: w.bounds,
             recoverDirtyIds: i === 0 ? orphanDirtyIds : [],
           }),
-        )[0] as BrowserWindow)
+        )[0] as WindowInfo)
   await sessionStore.markCleanExit(false)
-  first.webContents.on('did-finish-load', markDidFinishLoad)
-  installCrashHooks(() => first.webContents.reload())
+  first.window.webContents.on('did-finish-load', markDidFinishLoad)
+  installCrashHooks(() => first.window.webContents.reload())
 
   app.on('before-quit', (event) => {
     const hotExit = config.snapshot().settings.files.hotExit

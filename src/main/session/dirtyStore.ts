@@ -8,6 +8,7 @@ export type DirtyStore = {
   readonly write: (entry: DirtyEntry) => Promise<void>
   readonly clear: (id: string) => Promise<void>
   readonly list: () => Promise<DirtyEntry[]>
+  readonly clearWindow: (windowId: string) => Promise<void>
 }
 
 const codeOf = (e: unknown): string | undefined => (e as { code?: string })?.code
@@ -60,5 +61,10 @@ export const createDirtyStore = (userData: string, windowId = 'main'): DirtyStor
     }
   }
 
-  return { write, clear, list }
+  const clearWindow = async (windowId: string): Promise<void> => {
+    const entries = await list()
+    await Promise.all(entries.filter((e) => e.id.startsWith(`${windowId}:`)).map((e) => clear(e.id)))
+  }
+
+  return { write, clear, list, clearWindow }
 }

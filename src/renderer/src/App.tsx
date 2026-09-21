@@ -19,6 +19,7 @@ import { applyTheme } from './theme/apply'
 import { registerUserThemes, themeById } from './theme/themes'
 import { installModifierTracking } from './editor/pathLinks'
 import { PaneView } from './ui/layout/PaneView'
+import { TabGhost } from './ui/tabs/TabGhost'
 import { Sidebar } from './ui/sidebar/Sidebar'
 import { SplitGutter } from './ui/layout/SplitGutter'
 import { Palette, type PaletteMode } from './ui/palette/Palette'
@@ -186,6 +187,7 @@ export const App = () => {
           <StatusBar ws={ws} />
         </div>
       </div>
+      <TabGhost />
       <Palette
         open={paletteMode}
         initialText={paletteText}

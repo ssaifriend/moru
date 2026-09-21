@@ -153,21 +153,51 @@ test('window.new never adopts another window\'s unsaved buffer, and that buffer 
   await second.app.close()
 })
 
-test('a tab dragged out of the window opens in its own window', async () => {
+test('a tab dragged past the window edge tears off live, comes back on re-entry or Escape, and commits on release', async () => {
   const { app, page } = await launchApp()
   await page.evaluate(() => window.__moruTest!.focus())
   await page.keyboard.type('torn off')
+  const tabs = () => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))
+  const tab = (await page.locator('.tab').first().boundingBox())!
+  const inside = { x: tab.x + 20, y: tab.y + tab.height / 2 }
+  const outside = { x: -400, y: inside.y }
 
-  const second = app.waitForEvent('window')
-  const tab = page.locator('.tab').first()
-  const transfer = await page.evaluateHandle(() => new DataTransfer())
-  await tab.dispatchEvent('dragstart', { dataTransfer: transfer })
-  await tab.dispatchEvent('dragend', { dataTransfer: transfer, screenX: -10_000, screenY: -10_000 })
-  const page2 = await second
-  await page2.waitForFunction(() => window.__moruTest?.ready() === true)
+  await page.mouse.move(inside.x, inside.y)
+  await page.mouse.down()
+  await page.mouse.move(inside.x + 30, inside.y + 6, { steps: 3 })
+  await page.mouse.move(outside.x, outside.y, { steps: 6 })
+  await expect.poll(() => app.windows().length).toBe(2)
+  expect(await tabs()).toEqual(['untitled'])
 
-  await expect.poll(() => page2.evaluate(() => window.__moruTest!.doc())).toBe('torn off')
+  await page.mouse.move(inside.x + 200, inside.y + 100, { steps: 6 })
+  await expect.poll(() => app.windows().length).toBe(1)
+  expect(await tabs()).toEqual(['untitled'])
+  expect(await page.evaluate(() => window.__moruTest!.doc())).toBe('torn off')
+
+  await page.mouse.move(outside.x, outside.y, { steps: 6 })
+  await expect.poll(() => app.windows().length).toBe(2)
+  await page.keyboard.press('Escape')
+  await expect.poll(() => app.windows().length).toBe(1)
+  expect(await page.evaluate(() => window.__moruTest!.doc())).toBe('torn off')
+  expect(await page.locator('.tab-ghost').count()).toBe(0)
+
+  await page.mouse.move(inside.x, inside.y)
+  await page.mouse.down()
+  await page.mouse.move(inside.x + 30, inside.y + 6, { steps: 3 })
+  await page.mouse.move(outside.x, outside.y, { steps: 6 })
+  await expect.poll(() => app.windows().length).toBe(2)
+  const torn = app.windows().find((w) => w !== page)!
+  await page.mouse.move(outside.x - 100, outside.y + 50, { steps: 4 })
+  await torn.waitForFunction(() => window.__moruTest?.ready() === true)
+  await page.mouse.up()
+
+  await expect.poll(() => torn.evaluate(() => window.__moruTest!.doc())).toBe('torn off')
   await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('')
-  expect(await page.locator('.tab.dragging').count()).toBe(0)
+  expect(await tabs()).toEqual(['untitled'])
+  const [sourceBounds, tornBounds] = await Promise.all([
+    page.evaluate(() => ({ x: window.screenX, y: window.screenY })),
+    torn.evaluate(() => ({ x: window.screenX, y: window.screenY })),
+  ])
+  expect(tornBounds.x).toBeLessThan(sourceBounds.x)
   await app.close()
 })

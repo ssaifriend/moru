@@ -121,7 +121,21 @@ body.resizing-col { cursor: row-resize; }
   color: var(--fg);
 }
 
+body.tab-dragging { cursor: grabbing; user-select: none; }
+body.tab-dragging * { cursor: grabbing !important; }
 .tab.dragging { opacity: 0.4; }
+.tab-ghost {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  padding: 4px 10px;
+  background: var(--bar);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
 .tab.drop-before { box-shadow: inset 2px 0 0 var(--accent, #f9ae58); }
 .tab-drop-end { flex: 0 0 2px; background: var(--accent, #f9ae58); }
 .pane.drop-target { border-color: var(--accent, #f9ae58); }

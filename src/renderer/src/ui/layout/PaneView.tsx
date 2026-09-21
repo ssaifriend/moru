@@ -11,7 +11,7 @@ import { PreviewHost } from '../preview/PreviewHost'
 import { themeById } from '../../theme/themes'
 import type { PaneLeaf, PaneNode, PaneSplit } from './paneTree'
 import { SplitGutter } from './SplitGutter'
-import { draggingTab, dropIndexAt, dropTarget, endTabDrag, setDropTarget } from '../tabs/tabDrag'
+import { dropTarget } from '../tabs/tabDrag'
 
 type Props = { readonly ws: Workspace; readonly node: () => PaneNode }
 
@@ -38,47 +38,11 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
   }
   const editorHidden = () => terminalId() !== null || diffTab() !== null || searchTab() !== null || previewTab() !== null
 
-  let pane!: HTMLDivElement
-
-  // a drop on the strip lands between tabs; anywhere else in the pane appends
-  const dropIndexFor = (e: DragEvent): number => {
-    const strip = pane.querySelector<HTMLElement>(':scope > .tabs')
-    if (!strip || !(e.target instanceof Node) || !strip.contains(e.target)) return props.leaf().tabs.length
-    const edges = Array.from(strip.querySelectorAll<HTMLElement>(':scope > .tab')).map((el) => el.getBoundingClientRect())
-    return dropIndexAt(edges, e.clientX)
-  }
-
-  const onDragOver = (e: DragEvent): void => {
-    if (!draggingTab() || !e.dataTransfer) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    const next = { paneId: props.leaf().id, index: dropIndexFor(e) }
-    const current = dropTarget()
-    if (current?.paneId !== next.paneId || current.index !== next.index) setDropTarget(next)
-  }
-
-  const onDragLeave = (e: DragEvent): void => {
-    if (e.relatedTarget instanceof Node && pane.contains(e.relatedTarget)) return
-    if (dropTarget()?.paneId === props.leaf().id) setDropTarget(null)
-  }
-
-  const onDrop = (e: DragEvent): void => {
-    const drag = draggingTab()
-    if (!drag) return
-    e.preventDefault()
-    props.ws.moveTabToPane(drag.tabId, props.leaf().id, dropIndexFor(e))
-    endTabDrag()
-  }
-
   return (
     <div
       class="pane"
       classList={{ active: props.ws.state.activePane === props.leaf().id, 'drop-target': dropTarget()?.paneId === props.leaf().id }}
       data-pane-id={props.leaf().id}
-      ref={pane}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
     >
       <TabStrip ws={props.ws} leaf={props.leaf} />
       <Banner ws={props.ws} leaf={props.leaf} />
