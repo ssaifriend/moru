@@ -72,3 +72,102 @@ test('each window has its own folder and Goto index', async () => {
   expect(await query(second, 'alpha')).toEqual([])
   await app.close()
 })
+
+test('tab.moveToNewWindow carries an unsaved file tab into its own window and leaves an untitled here', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'moru-detach-'))
+  const path = join(dir, 'a.txt')
+  writeFileSync(path, 'disk\n')
+  const { app, page } = await launchApp({ MORU_TEST_OPEN: path })
+  await page.evaluate(() => window.__moruTest!.focus())
+  await page.evaluate(() => window.__moruTest!.setCursor(0))
+  await page.keyboard.type('edited ')
+
+  const second = app.waitForEvent('window')
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.moveToNewWindow'))
+  const page2 = await second
+  await page2.waitForFunction(() => window.__moruTest?.ready() === true)
+
+  expect(await page2.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.path))).toEqual([path])
+  await expect.poll(() => page2.evaluate(() => window.__moruTest!.doc())).toBe('edited disk\n')
+  expect(await page2.evaluate(() => window.__moruTest!.dirty())).toBe(true)
+  expect(await page2.evaluate(() => window.__moruTest!.projectRoot())).toBeNull()
+
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
+  expect(await page.evaluate(() => window.__moruTest!.doc())).toBe('')
+  await app.close()
+})
+
+test('tab.moveToNewWindow carries an untitled buffer with its text', async () => {
+  const { app, page } = await launchApp()
+  await page.evaluate(() => window.__moruTest!.focus())
+  await page.keyboard.type('scratch 한글')
+
+  const second = app.waitForEvent('window')
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.moveToNewWindow'))
+  const page2 = await second
+  await page2.waitForFunction(() => window.__moruTest?.ready() === true)
+
+  expect(await page2.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
+  await expect.poll(() => page2.evaluate(() => window.__moruTest!.doc())).toBe('scratch 한글')
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('')
+  await app.close()
+})
+
+test('tab.moveToNewWindow is refused while a folder is open', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'moru-detach-root-'))
+  const path = join(root, 'a.txt')
+  writeFileSync(path, 'a\n')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root, MORU_TEST_OPEN: path })
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.projectRoot())).toBe(root)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.moveToNewWindow'))
+  await page.waitForTimeout(500)
+  expect(app.windows().length).toBe(1)
+  expect(await page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.path))).toEqual([path])
+  await expect(page.getByTestId('status')).toContainText('folder open')
+  await app.close()
+})
+
+test('window.new never adopts another window\'s unsaved buffer, and that buffer still survives a crash', async () => {
+  const first = await launchApp()
+  await first.page.evaluate(() => window.__moruTest!.focus())
+  await first.page.keyboard.type('private draft')
+  await first.page.waitForTimeout(1500)
+
+  const w2 = first.app.waitForEvent('window')
+  await first.page.evaluate(() => window.__moruTest!.runCommand('window.new'))
+  const page2 = await w2
+  await page2.waitForFunction(() => window.__moruTest?.ready() === true)
+  expect(await page2.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
+  expect(await page2.evaluate(() => window.__moruTest!.doc())).toBe('')
+  expect(await first.page.evaluate(() => window.__moruTest!.doc())).toBe('private draft')
+
+  await first.page.waitForTimeout(1500)
+  first.app.process().kill('SIGKILL')
+  await new Promise((r) => setTimeout(r, 500))
+
+  const second = await launchApp({}, { userData: first.userData })
+  await expect.poll(() => second.app.windows().length).toBe(2)
+  const docs = async () => Promise.all(second.app.windows().map((w) => w.evaluate(() => window.__moruTest?.ready() ? window.__moruTest.doc() : null)))
+  await expect.poll(docs, { timeout: 10_000 }).toContain('private draft')
+  await second.app.close()
+})
+
+test('a tab dragged out of the window opens in its own window', async () => {
+  const { app, page } = await launchApp()
+  await page.evaluate(() => window.__moruTest!.focus())
+  await page.keyboard.type('torn off')
+
+  const second = app.waitForEvent('window')
+  const tab = page.locator('.tab').first()
+  const transfer = await page.evaluateHandle(() => new DataTransfer())
+  await tab.dispatchEvent('dragstart', { dataTransfer: transfer })
+  await tab.dispatchEvent('dragend', { dataTransfer: transfer, screenX: -10_000, screenY: -10_000 })
+  const page2 = await second
+  await page2.waitForFunction(() => window.__moruTest?.ready() === true)
+
+  await expect.poll(() => page2.evaluate(() => window.__moruTest!.doc())).toBe('torn off')
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('')
+  expect(await page.locator('.tab.dragging').count()).toBe(0)
+  await app.close()
+})

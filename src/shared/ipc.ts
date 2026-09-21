@@ -106,9 +106,13 @@ export const Bootstrap = z.object({
   projectRoot: z.string().nullable(),
   windowId: z.string(),
   session: WindowSnapshot.nullable(),
+  recoverDirtyIds: z.array(z.string()),
   test: z.boolean(),
 })
 export type Bootstrap = z.infer<typeof Bootstrap>
+
+export const ScreenPoint = z.object({ x: z.number(), y: z.number() })
+export type ScreenPoint = z.infer<typeof ScreenPoint>
 
 export const contracts = {
   'app.bootstrap': { request: z.undefined(), response: ipcResult(Bootstrap, UnexpectedError) },
@@ -123,6 +127,10 @@ export const contracts = {
   'fs.delete': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), OpenError) },
   'dialog.openFolder': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'window.new': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
+  'window.detach': {
+    request: z.object({ snapshot: WindowSnapshot, at: ScreenPoint.nullable() }),
+    response: ipcResult(z.literal(true), UnexpectedError),
+  },
   'index.build': {
     request: z.object({ root: z.string() }),
     response: ipcResult(z.object({ files: z.number().int(), truncated: z.boolean() }), UnexpectedError),

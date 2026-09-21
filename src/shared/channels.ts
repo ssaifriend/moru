@@ -11,6 +11,7 @@ export const channels = {
   fsDelete: 'fs.delete',
   dialogOpenFolder: 'dialog.openFolder',
   windowNew: 'window.new',
+  windowDetach: 'window.detach',
   sessionLoad: 'session.load',
   indexBuild: 'index.build',
   indexQuery: 'index.query',

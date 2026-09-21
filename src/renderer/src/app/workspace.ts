@@ -9,9 +9,9 @@ import { createStore, produce, unwrap } from 'solid-js/store'
 import { type Settings, resolveForLanguage } from '@shared/config'
 import type { EncodingName, Eol } from '@shared/encoding'
 import { fnv1a32 } from '@shared/hash'
-import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
+import type { DirtyEntry, OpenedFile, SaveError, ScreenPoint, TreeEntry } from '@shared/ipc'
 import type { ReplaceReport, SearchMatch, SearchSpec } from '@shared/search'
-import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, PreviewTabSnapshot, SearchTabSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
+import { singleTabWindow, type BufferTabSnapshot, type LeafSnapshot, type PaneSnapshot, type PreviewTabSnapshot, type SearchTabSnapshot, type TabSnapshot, type WindowSnapshot } from '@shared/session'
 import {
   type Buffer,
   type BufferId,
@@ -173,6 +173,9 @@ export type Workspace = {
   readonly splitActive: (direction: 'row' | 'col') => void
   readonly closeActivePane: () => void
   readonly singlePane: () => void
+  readonly moveTabToPane: (tabId: TabId, toPaneId: PaneId, index?: number) => void
+  readonly moveActiveTab: (delta: 1 | -1) => void
+  readonly detachTab: (tabId?: TabId, at?: ScreenPoint | null) => Promise<boolean>
   readonly focusPaneIndex: (n: number) => void
   readonly focusPane: (paneId: PaneId) => void
   readonly resizeSplit: (splitId: PaneId, sizes: readonly number[]) => void
@@ -188,7 +191,7 @@ export type Workspace = {
   readonly dismissBanner: (bufferId: BufferId) => void
   readonly reload: () => Promise<void>
   readonly saveAsUtf8: () => Promise<void>
-  readonly restoreDirty: () => Promise<void>
+  readonly restoreDirty: (ids: readonly string[]) => Promise<void>
   readonly keepMine: () => void
   readonly compareWithDisk: () => Promise<void>
   readonly recreateDeleted: () => Promise<void>
@@ -750,6 +753,74 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     focusView(first.id)
   }
 
+  const moveTabToPane = (tabId: TabId, toPaneId: PaneId, index?: number): void => {
+    const from = leafOfTab(currentTree, tabId)
+    const to = findLeaf(currentTree, toPaneId)
+    if (!from || !to) return
+
+    const fromIndex = from.tabs.indexOf(tabId)
+    const requested = Math.min(index ?? to.tabs.length, to.tabs.length)
+    const target = from.id === to.id && fromIndex < requested ? requested - 1 : requested
+    if (from.id === to.id && target === fromIndex) {
+      activateTab(to.id, tabId)
+      return
+    }
+
+    setTree(moveTab(currentTree, tabId, to.id, target))
+    focusView(to.id)
+  }
+
+  const moveActiveTab = (delta: 1 | -1): void => {
+    const leaf = activeLeaf()
+    const tabId = leaf.active
+    if (!tabId) return
+
+    if (leaves(currentTree).length > 1) {
+      moveTabToPane(tabId, siblingLeaf(currentTree, leaf.id, delta).id)
+      return
+    }
+    if (delta === -1) return
+
+    const fresh = nextPaneId()
+    setTree(splitLeaf(currentTree, leaf.id, 'row', fresh))
+    moveTabToPane(tabId, fresh)
+  }
+
+  const detachTab = async (tabId: TabId | undefined = activeLeaf().active ?? undefined, at: ScreenPoint | null = null): Promise<boolean> => {
+    const tab = tabId ? state.tabs[tabId] : undefined
+    if (!tab) return false
+    if (state.projectRoot !== null) {
+      setState('status', 'tabs stay in a window that has a folder open')
+      return false
+    }
+    if (tab.kind !== 'buffer') {
+      setState('status', 'only editor tabs move to a new window')
+      return false
+    }
+    const buffer = buffers[tab.bufferId]
+    if (!buffer) return false
+
+    const snap: BufferTabSnapshot = { ...bufferSnapshot(buffer), dirtyId: `handoff:${state.windowId}:${buffer.id}:${Date.now()}` }
+    if (buffer.meta === null || isDirty(buffer)) {
+      const written = await invoke('dirty.write', { ...dirtyEntry(buffer), id: snap.dirtyId })
+      if (R.isError(written)) {
+        setState('status', 'could not hand the tab to a new window')
+        return false
+      }
+    }
+
+    const opened = await invoke('window.detach', { snapshot: singleTabWindow(snap), at })
+    if (R.isError(opened)) {
+      void invoke('dirty.clear', snap.dirtyId)
+      setState('status', 'could not open a window for the tab')
+      return false
+    }
+
+    dropTab(tab.id)
+    ensureOneTab()
+    return true
+  }
+
   const updateActive = (f: (buffer: Buffer) => Buffer): void => {
     const buffer = activeBuffer()
     if (!buffer) return
@@ -813,9 +884,9 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     else putBuffer({ ...buffer, state: buffer.state.update(spec).state })
   }
 
-  const restoreDirty = async (): Promise<void> => {
+  const restoreDirty = async (ids: readonly string[]): Promise<void> => {
     const listed = await invoke('dirty.list', undefined)
-    const entries = R.getWithDefault(listed, [] as DirtyEntry[])
+    const entries = R.getWithDefault(listed, [] as DirtyEntry[]).filter((e) => ids.includes(e.id))
 
     for (const entry of entries) {
       const opened = entry.path ? await openFile(entry.path) : false
@@ -1411,7 +1482,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     if (snap.path === null) {
       if (!dirty) return
       const buffer = createBuffer(nextBufferId(), null, stateFor, untitledFormat())
-      addBufferTab({ ...buffer, state: stateFromSnapshot(dirty.text, 'plain', snap) })
+      addBufferTab({ ...buffer, languageId: snap.languageId, state: stateFromSnapshot(dirty.text, snap.languageId, snap) })
       return
     }
 
@@ -1447,12 +1518,16 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     const dirtyById = Object.fromEntries(dirtyEntries.map((e) => [e.id, e]))
     const { tree: built, leaves: leafSnaps } = treeFromSnapshot(snap.layout)
     setTree(built)
+    const consumed: string[] = []
 
     for (const leaf of leafSnaps) {
       setState('activePane', leaf.id)
       for (const tabSnap of leaf.snap.tabs) {
-        if (tabSnap.kind === 'buffer') await restoreBufferTab(tabSnap, dirtyById[tabSnap.dirtyId])
-        else if (tabSnap.kind === 'terminal') await restoreTerminalTab(tabSnap)
+        if (tabSnap.kind === 'buffer') {
+          const dirty = dirtyById[tabSnap.dirtyId]
+          await restoreBufferTab(tabSnap, dirty)
+          if (dirty) consumed.push(dirty.id)
+        } else if (tabSnap.kind === 'terminal') await restoreTerminalTab(tabSnap)
         else if (tabSnap.kind === 'search') restoreSearchTab(tabSnap)
         else restorePreviewTab(tabSnap)
       }
@@ -1461,7 +1536,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       if (restoredLeaf && activeTab) setTree(setActiveTab(currentTree, leaf.id, activeTab))
     }
 
-    for (const entry of dirtyEntries) await invoke('dirty.clear', entry.id)
+    for (const id of consumed) await invoke('dirty.clear', id)
 
     setState('sidebar', 'open', snap.sidebar.open)
     if (snap.sidebar.width) setSidebarWidth(snap.sidebar.width)
@@ -1766,6 +1841,9 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     splitActive,
     closeActivePane,
     singlePane,
+    moveTabToPane,
+    moveActiveTab,
+    detachTab,
     focusPaneIndex,
     focusPane: focusView,
     resizeSplit: (splitId, sizes) => setTree(resizeSplitTree(currentTree, splitId, sizes)),

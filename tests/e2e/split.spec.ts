@@ -63,3 +63,44 @@ test('the split gutter resizes panes while the mouse drifts off it', async () =>
   expect(await page.locator('.drag-overlay').count()).toBe(0)
   await app.close()
 })
+
+test('tab.moveToNextPane splits a lone pane and carries the tab across; moveToPrevPane brings it back', async () => {
+  const { app, page } = await launchApp({ MORU_TEST_OPEN: fixture })
+  await expect.poll(async () => (await panes(page)).length).toBe(1)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.moveToNextPane'))
+  await expect.poll(async () => (await panes(page)).length).toBe(2)
+  const moved = await panes(page)
+  expect(moved[0]?.tabs).toEqual([])
+  expect(moved[1]?.tabs.map((t) => t.title)).toEqual(['ime.ts'])
+  expect(moved[1]?.active).toBe(true)
+  expect(moved[1]?.tabs[0]?.active).toBe(true)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('tab.moveToPrevPane'))
+  await expect.poll(async () => (await panes(page))[0]?.tabs.map((t) => t.title)).toEqual(['ime.ts'])
+  const back = await panes(page)
+  expect(back[1]?.tabs).toEqual([])
+  expect(back[0]?.active).toBe(true)
+
+  await app.close()
+})
+
+test('dragging a tab onto another pane moves it there', async () => {
+  const { app, page } = await launchApp({ MORU_TEST_OPEN: fixture })
+  await page.evaluate(() => window.__moruTest!.runCommand('view.splitRight'))
+  await page.evaluate(() => window.__moruTest!.runCommand('file.new'))
+  await expect.poll(async () => (await panes(page))[1]?.tabs.map((t) => t.title)).toEqual(['untitled'])
+
+  const source = page.locator('.pane').nth(0).locator('.tab', { hasText: 'ime.ts' })
+  const strip = page.locator('.pane').nth(1).locator('.tabs')
+  await source.dragTo(strip, { targetPosition: { x: 300, y: 12 } })
+
+  await expect.poll(async () => (await panes(page))[1]?.tabs.map((t) => t.title)).toEqual(['untitled', 'ime.ts'])
+  const after = await panes(page)
+  expect(after[0]?.tabs).toEqual([])
+  expect(after[1]?.tabs[1]?.active).toBe(true)
+  expect(await page.locator('.pane.drop-target').count()).toBe(0)
+  expect(await page.locator('.tab.dragging').count()).toBe(0)
+
+  await app.close()
+})

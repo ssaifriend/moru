@@ -132,6 +132,7 @@ export const App = () => {
       projectRoot: null as string | null,
       windowId: 'main',
       session: null,
+      recoverDirtyIds: [] as string[],
       test: false,
     })
     if (boot.test) installTestHooks(ws, registry, paletteMode, ready, bindings)
@@ -162,9 +163,8 @@ export const App = () => {
     if (boot.session) {
       const listed = await invoke('dirty.list', undefined)
       await ws.restoreSession(boot.session, R.getWithDefault(listed, []))
-    } else {
-      await ws.restoreDirty()
     }
+    if (boot.recoverDirtyIds.length > 0) await ws.restoreDirty(boot.recoverDirtyIds)
     for (const path of boot.paths) await ws.openFile(path)
     if (boot.paths.length === 0 && ws.activeLeaf().tabs.length === 0) ws.newUntitled()
     ws.activeView()?.focus()

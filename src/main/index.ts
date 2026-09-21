@@ -7,7 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { A, pipe } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
-import type { Bounds, WindowSnapshot } from '@shared/session'
+import { dirtyIdsOf, type WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
 import { createThemesService } from './config/themes'
 import { createIndexRegistry } from './index/registry'
@@ -27,7 +27,8 @@ import { createSessionStore } from './session/sessionStore'
 import { createExpectedWrites } from './watch/expected'
 import { createWatchService } from './watch/service'
 import { createWindow } from './window'
-import { createWindowRegistry, pushTo } from './windows'
+import { createWindowRegistry, pushTo, type OpenWindowOptions } from './windows'
+import type { DirtyStore } from './session/dirtyStore'
 
 const isTest = process.env['MORU_TEST'] === '1'
 const hidden = process.env['MORU_HIDDEN'] === '1'
@@ -39,6 +40,13 @@ registerAppFileScheme()
 
 const isExistingFile = (path: string): boolean => existsSync(path) && statSync(path).isFile()
 const isExistingDir = (path: string): boolean => existsSync(path) && statSync(path).isDirectory()
+
+// unsaved text nobody's saved layout references: crash-recovered by the first window only
+const orphanDirtyEntries = async (dirty: DirtyStore, snapshots: readonly WindowSnapshot[]): Promise<readonly string[]> => {
+  const referenced = snapshots.flatMap((s) => dirtyIdsOf(s.layout))
+  const entries = await dirty.list()
+  return entries.map((e) => e.id).filter((id) => !referenced.includes(id))
+}
 
 const argvPaths = (): readonly string[] =>
   pipe(
@@ -107,14 +115,9 @@ app.whenReady().then(async () => {
     quitting = true
   })
 
-  const openWindow = (
-    paths: readonly string[],
-    projectRoot: string | null,
-    session: WindowSnapshot | null = null,
-    bounds: Bounds | null = null,
-  ): BrowserWindow => {
+  const openWindow = ({ paths = [], projectRoot, session = null, bounds = null, recoverDirtyIds = [] }: OpenWindowOptions): BrowserWindow => {
     const window = createWindow(bounds)
-    const info = windows.add({ window, startupPaths: paths, projectRoot, session })
+    const info = windows.add({ window, startupPaths: paths, projectRoot, session, recoverDirtyIds })
     const contents = window.webContents
     window.on('closed', () => {
       ptyManager.killOwnedBy(contents)
@@ -135,7 +138,7 @@ app.whenReady().then(async () => {
     expected,
     home: app.getPath('home'),
     windows,
-    openWindow: (projectRoot) => void openWindow([], projectRoot),
+    openWindow: (options) => void openWindow(options),
     session: sessionStore,
     index,
     search,
@@ -148,16 +151,18 @@ app.whenReady().then(async () => {
 
   const savedSession = await sessionStore.load()
   const saved = savedSession?.windows ?? []
+  const orphanDirtyIds = await orphanDirtyEntries(dirty, saved.map((w) => w.snapshot))
   const first =
     saved.length === 0
-      ? openWindow(startupPaths(), startupRoot())
+      ? openWindow({ paths: startupPaths(), projectRoot: startupRoot(), recoverDirtyIds: orphanDirtyIds })
       : (saved.map((w, i) =>
-          openWindow(
-            i === 0 ? startupPaths() : [],
-            i === 0 ? (startupRoot() ?? w.snapshot.projectRoot) : w.snapshot.projectRoot,
-            w.snapshot,
-            w.bounds,
-          ),
+          openWindow({
+            paths: i === 0 ? startupPaths() : [],
+            projectRoot: i === 0 ? (startupRoot() ?? w.snapshot.projectRoot) : w.snapshot.projectRoot,
+            session: w.snapshot,
+            bounds: w.bounds,
+            recoverDirtyIds: i === 0 ? orphanDirtyIds : [],
+          }),
         )[0] as BrowserWindow)
   await sessionStore.markCleanExit(false)
   first.webContents.on('did-finish-load', markDidFinishLoad)
@@ -181,7 +186,7 @@ app.whenReady().then(async () => {
   })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) openWindow([], startupRoot())
+    if (BrowserWindow.getAllWindows().length === 0) openWindow({ projectRoot: startupRoot() })
   })
 })
 

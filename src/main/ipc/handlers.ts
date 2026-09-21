@@ -1,9 +1,10 @@
 import { existsSync, statSync } from 'node:fs'
-import { dialog, ipcMain } from 'electron'
+import { dialog, ipcMain, screen } from 'electron'
 import { channels } from '@shared/channels'
 import { CloseChoice, ContextMenuRequest, PtyAck } from '@shared/ipc'
 import { WindowSnapshot } from '@shared/session'
 import { ok } from '@shared/result'
+import { detachedBounds } from '../detachBounds'
 import type { ConfigService, KeymapService } from '../config/service'
 import type { ThemesService } from '../config/themes'
 import { createFile, renamePath, trashPath } from '../fs/ops'
@@ -19,7 +20,7 @@ import type { DirtyStore } from '../session/dirtyStore'
 import type { SessionStore } from '../session/sessionStore'
 import type { ExpectedWrites } from '../watch/expected'
 import type { WatchService } from '../watch/service'
-import type { WindowRegistry } from '../windows'
+import type { OpenWindowOptions, WindowRegistry } from '../windows'
 import { handle } from './register'
 import { showContextMenu } from '../menu'
 
@@ -35,7 +36,7 @@ export type HandlerDeps = {
   readonly expected: ExpectedWrites
   readonly home: string
   readonly windows: WindowRegistry
-  readonly openWindow: (projectRoot: string | null) => void
+  readonly openWindow: (options: OpenWindowOptions) => void
   readonly session: SessionStore
   readonly index: IndexRegistry
   readonly search: SearchService
@@ -65,6 +66,7 @@ export const registerHandlers = ({
       projectRoot: info?.projectRoot ?? null,
       windowId: info?.windowId ?? 'unknown',
       session: info?.session ?? null,
+      recoverDirtyIds: [...(info?.recoverDirtyIds ?? [])],
       test: isTest,
     })
   })
@@ -105,7 +107,13 @@ export const registerHandlers = ({
   })
 
   handle('window.new', async () => {
-    openWindow(null)
+    openWindow({ projectRoot: null })
+    return ok(true as const)
+  })
+
+  handle('window.detach', async ({ snapshot, at }) => {
+    const bounds = at ? detachedBounds(at, screen.getDisplayNearestPoint(at).workArea) : null
+    openWindow({ projectRoot: null, session: snapshot, bounds })
     return ok(true as const)
   })
 

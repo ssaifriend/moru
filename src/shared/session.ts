@@ -62,6 +62,19 @@ export const WindowSnapshot = z.object({
 })
 export type WindowSnapshot = z.infer<typeof WindowSnapshot>
 
+export const dirtyIdsOf = (layout: PaneSnapshot): readonly string[] =>
+  layout.kind === 'leaf'
+    ? layout.tabs.flatMap((tab) => (tab.kind === 'buffer' ? [tab.dirtyId] : []))
+    : layout.children.flatMap(dirtyIdsOf)
+
+export const singleTabWindow = (tab: TabSnapshot): WindowSnapshot => ({
+  windowId: 'detached',
+  projectRoot: null,
+  sidebar: { open: true, expanded: [] },
+  layout: { kind: 'leaf', tabs: [tab], active: 0 },
+  activePath: [],
+})
+
 export const Bounds = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
 export type Bounds = z.infer<typeof Bounds>
 

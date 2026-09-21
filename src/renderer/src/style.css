@@ -121,6 +121,11 @@ body.resizing-col { cursor: row-resize; }
   color: var(--fg);
 }
 
+.tab.dragging { opacity: 0.4; }
+.tab.drop-before { box-shadow: inset 2px 0 0 var(--accent, #f9ae58); }
+.tab-drop-end { flex: 0 0 2px; background: var(--accent, #f9ae58); }
+.pane.drop-target { border-color: var(--accent, #f9ae58); }
+
 .tab-dirty { display: none; color: #e6c07b; }
 .tab.dirty .tab-dirty { display: inline; }
 

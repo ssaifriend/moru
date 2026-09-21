@@ -1,7 +1,7 @@
 import type { BrowserWindow, WebContents } from 'electron'
 import { D } from '@mobily/ts-belt'
 import type { PushChannel, PushPayload } from '@shared/ipc'
-import type { WindowSnapshot } from '@shared/session'
+import type { Bounds, WindowSnapshot } from '@shared/session'
 
 export type WindowInfo = {
   readonly windowId: string
@@ -9,6 +9,15 @@ export type WindowInfo = {
   readonly startupPaths: readonly string[]
   readonly projectRoot: string | null
   readonly session: WindowSnapshot | null
+  readonly recoverDirtyIds: readonly string[]
+}
+
+export type OpenWindowOptions = {
+  readonly paths?: readonly string[]
+  readonly projectRoot: string | null
+  readonly session?: WindowSnapshot | null
+  readonly bounds?: Bounds | null
+  readonly recoverDirtyIds?: readonly string[]
 }
 
 export type WindowRegistry = {
