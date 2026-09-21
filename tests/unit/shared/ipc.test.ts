@@ -88,9 +88,12 @@ describe('ipc contracts', () => {
 
   it('app.bootstrap response carries paths and test flag', () => {
     const schema = contracts['app.bootstrap'].response
-    expect(schema.safeParse({ ok: true, value: { paths: [], projectRoot: null, windowId: 'w1', session: null, test: true } }).success).toBe(true)
-    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], projectRoot: '/x', windowId: 'w1', session: null, test: false } }).success).toBe(true)
+    const base = { paths: [], projectRoot: null, windowId: 'w1', session: null, recoverDirtyIds: [], test: true }
+    expect(schema.safeParse({ ok: true, value: base }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { ...base, paths: ['/x.md'], projectRoot: '/x', recoverDirtyIds: ['w1:b1'], test: false } }).success).toBe(true)
     expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(false)
+    const { recoverDirtyIds: _omitted, ...withoutRecovery } = base
+    expect(schema.safeParse({ ok: true, value: withoutRecovery }).success).toBe(false)
   })
 
   it('search.run request fills include/exclude defaults', () => {
