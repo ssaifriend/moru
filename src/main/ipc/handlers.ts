@@ -138,6 +138,14 @@ export const registerHandlers = ({
     const found = paths.map(expand).find(isFile) ?? null
     return ok({ path: found })
   })
+  handle('fs.stat', async ({ path }) => {
+    try {
+      const stat = statSync(path)
+      return ok({ kind: stat.isDirectory() ? ('dir' as const) : ('file' as const) })
+    } catch {
+      return ok({ kind: 'missing' as const })
+    }
+  })
   handle('fs.create', ({ path }) => createFile(path))
   handle('fs.rename', ({ from, to }) => renamePath(from, to))
   handle('fs.delete', ({ path }) => trashPath(path))

@@ -14,6 +14,7 @@ export const BufferTabSnapshot = z.object({
   scrollPos: z.number().int().nonnegative().optional(),
   history: z.unknown().nullable(),
   languageId: z.string(),
+  wordWrap: z.boolean().optional(),
 })
 export type BufferTabSnapshot = z.infer<typeof BufferTabSnapshot>
 

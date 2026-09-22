@@ -44,6 +44,7 @@ import { markdownExtensions } from '../markdown/extension'
 import { exportName, wrapDocument } from '../markdown/exportHtml'
 import { createRenderer } from '../markdown/render'
 import { invoke, on } from '../ipc'
+import { shellQuote } from './fileDrop'
 import { searchState as searchLocal } from '../search/local'
 import {
   type SearchState,
@@ -234,6 +235,8 @@ export type Workspace = {
   readonly exportMarkdown: (bufferId: BufferId | null, kind: 'html' | 'pdf') => Promise<void>
   readonly copyMarkdownHtml: (bufferId: BufferId | null) => Promise<void>
   readonly toggleSidebar: () => void
+  readonly toggleWordWrap: () => void
+  readonly openDropped: (paths: readonly string[], intoTerminal: boolean) => Promise<void>
   readonly setSidebarWidth: (px: number) => void
   readonly revealInSidebar: (path: string) => Promise<void>
   readonly expandDir: (dir: string) => Promise<void>
@@ -438,13 +441,43 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     fontSize: next.editor.fontSize,
   })
 
+  // a buffer toggled by View: Toggle Word Wrap keeps its choice across settings reloads
+  const editorSettingsFor = (buffer: Buffer, base: Settings = settings()) => {
+    const resolved = resolveForLanguage(base, buffer.languageId)
+    return buffer.wordWrap === undefined ? resolved : { ...resolved, wordWrap: buffer.wordWrap }
+  }
+
+  const reconfigureEditor = (buffer: Buffer): void => {
+    const effects = settingsCompartment.reconfigure(configExtensions(editorSettingsFor(buffer)))
+    const view = viewShowing(buffer.id)
+    if (view) {
+      view.dispatch({ effects })
+      putBuffer({ ...buffer, state: view.state })
+    } else {
+      putBuffer({ ...buffer, state: buffer.state.update({ effects }).state })
+    }
+  }
+
+  const setWordWrap = (bufferId: BufferId, wordWrap: boolean | undefined): void => {
+    const buffer = buffers[bufferId]
+    if (buffer) reconfigureEditor({ ...buffer, wordWrap })
+  }
+
+  const toggleWordWrap = (): void => {
+    const buffer = activeBuffer()
+    if (!buffer) return
+    const wrapped = editorSettingsFor(buffer).wordWrap
+    setWordWrap(buffer.id, !wrapped)
+    setState('status', wrapped ? 'word wrap off' : 'word wrap on')
+  }
+
   const applySettings = (next: Settings): void => {
     const options = terminalOptions(next)
     terminalRegistry.setTheme(options.theme)
     terminalRegistry.setFont(options.fontFamily, options.fontSize)
     D.values(buffers).forEach((buffer) => {
       const effects = [
-        settingsCompartment.reconfigure(configExtensions(resolveForLanguage(next, buffer.languageId))),
+        settingsCompartment.reconfigure(configExtensions(editorSettingsFor(buffer, next))),
         themeCompartment.reconfigure(themeById(next.theme).editor),
       ]
       const view = viewShowing(buffer.id)
@@ -1172,6 +1205,21 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     await invoke('pty.write', { id, data: text })
   }
 
+  // files dropped from the OS open as tabs, a folder becomes the project, and a drop on the terminal types the paths
+  const openDropped = async (paths: readonly string[], intoTerminal: boolean): Promise<void> => {
+    if (intoTerminal) {
+      await sendToTerminal(paths.map(shellQuote).join(' '))
+      return
+    }
+
+    const kinds = await Promise.all(
+      paths.map(async (path) => ({ path, kind: R.getWithDefault(await invoke('fs.stat', { path }), { kind: 'missing' as const }).kind })),
+    )
+    const dir = kinds.find((k) => k.kind === 'dir')
+    if (dir) await setProjectRoot(dir.path)
+    for (const { path } of kinds.filter((k) => k.kind === 'file')) await openFile(path)
+  }
+
   const relativePath = (path: string): string => {
     const base = state.projectRoot ?? state.terminals[activeTerminalId() ?? lastLiveTerminalId() ?? '']?.cwd
     return base && path.startsWith(base) && /[\\/]/.test(path.charAt(base.length)) ? path.slice(base.length + 1) : path
@@ -1459,6 +1507,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       })(),
       history: json.history ?? null,
       languageId: buffer.languageId,
+      ...(buffer.wordWrap === undefined ? {} : { wordWrap: buffer.wordWrap }),
     }
   }
 
@@ -1539,10 +1588,14 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
   }
 
   const restoreBufferTab = async (snap: BufferTabSnapshot, dirty: DirtyEntry | undefined): Promise<void> => {
+    const restoreWrap = (bufferId: BufferId): void => {
+      if (snap.wordWrap !== undefined) setWordWrap(bufferId, snap.wordWrap)
+    }
     if (snap.path === null) {
       if (!dirty) return
       const buffer = createBuffer(nextBufferId(), null, stateFor, untitledFormat())
       addBufferTab({ ...buffer, languageId: snap.languageId, state: stateFromSnapshot(dirty.text, snap.languageId, snap) })
+      restoreWrap(buffer.id)
       return
     }
 
@@ -1555,6 +1608,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         const restored: Buffer = { ...base, state: stateFromSnapshot(text, base.languageId, snap), format: snap.format }
         rememberScroll(restored.id, snap.scrollPos ?? 0)
         addBufferTab(restored)
+        restoreWrap(restored.id)
         void invoke('fs.watch', { path: file.path })
         if (dirty && snap.hash !== null && snap.hash !== file.hash) setState('banners', restored.id, { kind: 'external', diskHash: file.hash })
       },
@@ -1562,6 +1616,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         if (!dirty) return
         const buffer = createBuffer(nextBufferId(), null, stateFor, untitledFormat())
         addBufferTab({ ...buffer, state: stateFromSnapshot(dirty.text, 'plain', snap) })
+        restoreWrap(buffer.id)
       },
     )
   }
@@ -1962,6 +2017,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     exportMarkdown,
     copyMarkdownHtml,
     toggleSidebar,
+    toggleWordWrap,
+    openDropped,
     setSidebarWidth,
     revealInSidebar,
     expandDir,

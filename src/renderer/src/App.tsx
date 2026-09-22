@@ -6,6 +6,7 @@ import { registerAppCommands } from './app/registerCommands'
 import { createDirtySync } from './app/dirtySync'
 import { createSettings } from './app/settings'
 import { installSessionSync } from './app/sessionSync'
+import { installFileDrop } from './app/fileDrop'
 import { installKeymap } from './app/useKeymap'
 import { createWorkspace, type CloseChoice } from './app/workspace'
 import { createCommandRegistry } from './commands/registry'
@@ -119,10 +120,15 @@ export const App = () => {
     const uninstall = installKeymap(window, bindings, registry, context)
     const uninstallModifiers = installModifierTracking(window)
     const offCommand = on('command.run', ({ id, args }) => void registry.run(id, args))
+    const uninstallDrop = installFileDrop(window, {
+      pathOf: (file) => window.moru.pathForFile(file),
+      onDrop: (paths, intoTerminal) => void ws.openDropped(paths, intoTerminal),
+    })
     onCleanup(() => {
       uninstall()
       uninstallModifiers()
       offCommand()
+      uninstallDrop()
     })
 
     requestAnimationFrame(() => window.moru.send(channels.perfFirstPaint, undefined))

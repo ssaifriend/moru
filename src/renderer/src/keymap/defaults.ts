@@ -41,6 +41,7 @@ const common: readonly Binding[] = [
   { keys: 'mod+alt+arrowleft', command: 'tab.prev' },
   { keys: 'ctrl+`', command: 'terminal.new' },
   { keys: 'mod+k mod+b', command: 'sidebar.toggle' },
+  { keys: 'alt+z', command: 'view.toggleWordWrap' },
   { keys: 'mod+alt+enter', command: 'terminal.sendSelection' },
   { keys: 'mod+alt+shift+enter', command: 'terminal.sendAtPath' },
   { keys: 'ctrl+shift+tab', command: 'tab.prev' },

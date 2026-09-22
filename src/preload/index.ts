@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { channelList, pushChannels, sendChannels } from '../shared/channels'
 
 const allowed = (list: readonly string[], channel: string): boolean => list.includes(channel)
@@ -20,6 +20,8 @@ const api = {
     ipcRenderer.on(channel, wrapped)
     return () => ipcRenderer.removeListener(channel, wrapped)
   },
+
+  pathForFile: (file: File): string => webUtils.getPathForFile(file),
 
   memory: (): Promise<{ privateMb: number; sharedMb: number }> =>
     process.getProcessMemoryInfo().then((m) => ({ privateMb: Math.round(m.private / 1024), sharedMb: Math.round(m.shared / 1024) })),

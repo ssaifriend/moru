@@ -6,6 +6,7 @@ export const channels = {
   fsUnwatch: 'fs.unwatch',
   fsTree: 'fs.tree',
   fsExists: 'fs.exists',
+  fsStat: 'fs.stat',
   fsCreate: 'fs.create',
   fsRename: 'fs.rename',
   fsDelete: 'fs.delete',

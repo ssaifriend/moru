@@ -16,6 +16,7 @@ export type Buffer = {
   readonly state: EditorState
   readonly format: Format
   readonly saved: Saved
+  readonly wordWrap?: boolean
 }
 
 export const metaOfFile = ({ text: _text, ...meta }: OpenedFile): FileMeta => meta

@@ -85,6 +85,7 @@ export const registerAppCommands = (registry: CommandRegistry, ws: Workspace, ui
     { id: 'find.replaceAll', title: 'Replace All', when: 'hasBuffer', run: () => ws.replaceAll() },
     { id: 'find.close', title: 'Close Find Panel', when: 'hasBuffer', run: () => ws.closeFind() },
     { id: 'sidebar.toggle', title: 'View: Toggle Sidebar', run: () => ws.toggleSidebar() },
+    { id: 'view.toggleWordWrap', title: 'View: Toggle Word Wrap', when: 'hasBuffer', run: () => ws.toggleWordWrap() },
     { id: 'window.new', title: 'Window: New Window', run: async () => void (await invoke('window.new', undefined)) },
     {
       id: 'project.openFolder',

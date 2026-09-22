@@ -27,6 +27,9 @@ export const createWindow = (bounds: WindowBounds | null = null, { inactive = fa
     else window.show()
   })
 
+  // a URL or file dropped outside an accepting target must never replace the app page
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }

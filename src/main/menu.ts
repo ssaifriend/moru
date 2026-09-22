@@ -69,6 +69,7 @@ export const installMenu = (): void => {
       submenu: [
         command('Command Palette…', 'palette.commands', 'CmdOrCtrl+Shift+P'),
         command('Toggle Sidebar', 'sidebar.toggle'),
+        command('Toggle Word Wrap', 'view.toggleWordWrap', 'Alt+Z'),
         { type: 'separator' },
         command('Split Right', 'view.splitRight'),
         command('Split Down', 'view.splitDown'),
