@@ -28,8 +28,12 @@ export const createSessionStore = (userData: string, { debounceMs = 300 }: { deb
     windows: order.flatMap((id) => (entries[id] ? [entries[id] as Entry] : [])),
   })
 
-  const write = async (): Promise<void> => {
-    await writeAtomically(path, Buffer.from(JSON.stringify(current(), null, 2), 'utf8'))
+  // writes queue behind each other so a later state can never be overtaken by an earlier one
+  let writing: Promise<void> = Promise.resolve()
+  const write = (): Promise<void> => {
+    const run = (): Promise<void> => writeAtomically(path, Buffer.from(JSON.stringify(current(), null, 2), 'utf8'))
+    writing = writing.then(run, run)
+    return writing
   }
 
   const schedule = (): void => {
@@ -55,11 +59,13 @@ export const createSessionStore = (userData: string, { debounceMs = 300 }: { deb
       entries = { ...entries, [windowId]: { snapshot, bounds } }
       schedule()
     },
+    // a closed window must not come back after a crash in the next few hundred ms: write at once
     remove: (windowId) => {
       const { [windowId]: _dropped, ...rest } = entries
       entries = rest
       order = order.filter((id) => id !== windowId)
-      schedule()
+      if (timer) clearTimeout(timer)
+      void write()
     },
     markCleanExit: async (clean) => {
       cleanExit = clean

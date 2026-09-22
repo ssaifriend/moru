@@ -5,7 +5,7 @@ import watcher from '@parcel/watcher'
 import { rgPath } from '@vscode/ripgrep'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { A, pipe } from '@mobily/ts-belt'
+import { A, D, pipe } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
 import { dirtyIdsOf, type WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
@@ -115,11 +115,20 @@ app.whenReady().then(async () => {
   app.on('before-quit', () => {
     quitting = true
   })
+  let approvedClose: Record<string, true> = {}
 
   const openWindow = ({ paths = [], projectRoot, session = null, bounds = null, recoverDirtyIds = [], inactive = false }: OpenWindowOptions): WindowInfo => {
     const window = createWindow(bounds, { inactive })
     const info = windows.add({ window, startupPaths: paths, projectRoot, session, recoverDirtyIds })
     const contents = window.webContents
+    // closing a window with unsaved buffers goes through the renderer's save prompts first;
+    // the last window closes through the quit path so hot exit keeps its session
+    window.on('close', (event) => {
+      if (quitting || approvedClose[info.windowId]) return
+      event.preventDefault()
+      if (BrowserWindow.getAllWindows().length <= 1) app.quit()
+      else pushTo(contents, 'window.closeRequested', {})
+    })
     window.on('closed', () => {
       ptyManager.killOwnedBy(contents)
       void index.release(contents)
@@ -141,6 +150,12 @@ app.whenReady().then(async () => {
     home: app.getPath('home'),
     windows,
     openWindow: (options) => void openWindow(options),
+    closeWindow: (sender) => {
+      const info = windows.bySender(sender)
+      if (!info || info.window.isDestroyed()) return
+      approvedClose = D.set(approvedClose, info.windowId, true)
+      info.window.close()
+    },
     tearOff,
     session: sessionStore,
     index,

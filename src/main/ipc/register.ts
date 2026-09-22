@@ -1,6 +1,7 @@
 import { ipcMain, type WebContents } from 'electron'
 import { contracts, type InvokeChannel, type RequestOf, type ResponseOf } from '@shared/ipc'
 import { err, unexpected } from '@shared/result'
+import { logger } from '../log'
 
 export type HandlerContext = { readonly sender: WebContents }
 
@@ -14,12 +15,14 @@ export const handle = <C extends InvokeChannel>(channel: C, handler: Handler<C>)
   ipcMain.handle(channel, async (event, raw: unknown): Promise<ResponseOf<C>> => {
     const parsed = requestSchema.safeParse(raw)
     if (!parsed.success) {
+      logger.warn(`invalid request on ${channel}`, parsed.error.message)
       return err(unexpected(`invalid request on ${channel}: ${parsed.error.message}`)) as ResponseOf<C>
     }
 
     try {
       return await handler(parsed.data as RequestOf<C>, { sender: event.sender })
     } catch (e) {
+      logger.error(`handler failed on ${channel}`, messageOf(e))
       return err(unexpected(messageOf(e))) as ResponseOf<C>
     }
   })

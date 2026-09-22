@@ -16,6 +16,8 @@ export const channels = {
   windowDetachCommit: 'window.detachCommit',
   windowDetachCancel: 'window.detachCancel',
   windowDetachMove: 'window.detachMove',
+  windowClose: 'window.close',
+  windowCloseRequested: 'window.closeRequested',
   sessionLoad: 'session.load',
   indexBuild: 'index.build',
   indexQuery: 'index.query',
@@ -78,6 +80,7 @@ export const pushChannels: readonly Channel[] = [
   channels.fsChanged,
   channels.fsDeleted,
   channels.indexChanged,
+  channels.windowCloseRequested,
   channels.searchBatch,
   channels.searchDone,
 ]

@@ -168,6 +168,7 @@ export type Workspace = {
   readonly openFile: (path: string) => Promise<boolean>
   readonly newUntitled: () => void
   readonly closeTab: (tabId?: TabId) => Promise<void>
+  readonly closeWindow: () => Promise<void>
   readonly activateTab: (paneId: PaneId, tabId: TabId) => void
   readonly selectTabIndex: (n: number) => void
   readonly cycleTab: (delta: 1 | -1) => void
@@ -691,7 +692,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     return R.match(
       picked,
       (d) => d.path,
-      () => null,
+      (error) => {
+        setState('status', `save dialog failed: ${error.message}`)
+        return null
+      },
     )
   }
 
@@ -745,6 +749,25 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
     dropTab(tab.id)
     ensureOneTab()
+  }
+
+  // the window asked to close: settle every unsaved buffer first, then let main close it
+  const closeWindow = async (): Promise<void> => {
+    for (const tab of D.values(state.tabs)) {
+      if (tab.kind !== 'buffer') continue
+      const buffer = buffers[tab.bufferId]
+      if (!buffer || !isDirty(buffer)) continue
+
+      const choice = await confirmClose(titleOf(buffer))
+      if (choice === 'cancel') return
+      if (choice === 'save') {
+        const path = buffer.meta?.path ?? (await pickSavePath(null))
+        if (!path || !(await saveBuffer(buffer, 'normal', path))) return
+      } else {
+        dropTab(tab.id)
+      }
+    }
+    await invoke('window.close', undefined)
   }
 
   const activateTab = (paneId: PaneId, tabId: TabId): void => {
@@ -1950,6 +1973,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     openFile,
     newUntitled,
     closeTab,
+    closeWindow,
     activateTab,
     selectTabIndex,
     cycleTab,

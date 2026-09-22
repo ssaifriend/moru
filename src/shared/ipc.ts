@@ -132,6 +132,7 @@ export const contracts = {
     request: z.object({ snapshot: WindowSnapshot, bounds: Bounds, live: z.boolean() }),
     response: ipcResult(z.object({ windowId: z.string() }), UnexpectedError),
   },
+  'window.close': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
   'window.detachCommit': { request: z.undefined(), response: ipcResult(z.object({ committed: z.boolean() }), UnexpectedError) },
   'window.detachCancel': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
   'index.build': {
@@ -203,6 +204,7 @@ export const pushContracts = {
   'fs.changed': z.object({ path: z.string(), hash: z.string(), mtimeMs: z.number() }),
   'fs.deleted': z.object({ path: z.string() }),
   'index.changed': z.object({ files: z.number().int() }),
+  'window.closeRequested': z.object({}),
   'search.batch': SearchBatch,
   'search.done': SearchDone,
 } as const

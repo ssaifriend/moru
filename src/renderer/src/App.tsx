@@ -120,6 +120,7 @@ export const App = () => {
     const uninstall = installKeymap(window, bindings, registry, context)
     const uninstallModifiers = installModifierTracking(window)
     const offCommand = on('command.run', ({ id, args }) => void registry.run(id, args))
+    const offCloseRequest = on('window.closeRequested', () => void ws.closeWindow())
     const uninstallDrop = installFileDrop(window, {
       pathOf: (file) => window.moru.pathForFile(file),
       onDrop: (paths, intoTerminal) => void ws.openDropped(paths, intoTerminal),
@@ -128,6 +129,7 @@ export const App = () => {
       uninstall()
       uninstallModifiers()
       offCommand()
+      offCloseRequest()
       uninstallDrop()
     })
 

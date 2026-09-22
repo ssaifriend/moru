@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs'
-import { dialog, ipcMain } from 'electron'
+import { dialog, ipcMain, type WebContents } from 'electron'
 import { channels } from '@shared/channels'
 import { CloseChoice, ContextMenuRequest, PtyAck, ScreenPoint } from '@shared/ipc'
 import { WindowSnapshot } from '@shared/session'
@@ -37,6 +37,7 @@ export type HandlerDeps = {
   readonly home: string
   readonly windows: WindowRegistry
   readonly openWindow: (options: OpenWindowOptions) => void
+  readonly closeWindow: (sender: WebContents) => void
   readonly tearOff: TearOffService
   readonly session: SessionStore
   readonly index: IndexRegistry
@@ -55,6 +56,7 @@ export const registerHandlers = ({
   home,
   windows,
   openWindow,
+  closeWindow,
   tearOff,
   session,
   index,
@@ -114,6 +116,10 @@ export const registerHandlers = ({
   })
 
   handle('window.detach', async ({ snapshot, bounds, live }, { sender }) => ok({ windowId: tearOff.start(sender, snapshot, bounds, live) }))
+  handle('window.close', async (_request, { sender }) => {
+    closeWindow(sender)
+    return ok(true as const)
+  })
   handle('window.detachCommit', async (_request, { sender }) => ok({ committed: tearOff.commit(sender) }))
   handle('window.detachCancel', async (_request, { sender }) => {
     await tearOff.cancel(sender)
