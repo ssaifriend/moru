@@ -181,6 +181,7 @@ export const registerHandlers = ({
   })
 
   const pickSavePath = async (defaultPath: string | null): Promise<string | null> => {
+    if (isTest) globalThis.__moruLastSaveDefault = defaultPath
     const stub = process.env['MORU_TEST_SAVE_PATH']
     if (isTest && stub) return stub
     const { canceled, filePath } = await dialog.showSaveDialog({ defaultPath: defaultPath ?? undefined })

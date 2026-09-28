@@ -687,8 +687,9 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     )
   }
 
+  // a buffer without a path starts the save dialog in the open folder, where a new file most likely belongs
   const pickSavePath = async (current: string | null): Promise<string | null> => {
-    const picked = await invoke('dialog.saveFile', current)
+    const picked = await invoke('dialog.saveFile', current ?? state.projectRoot)
     return R.match(
       picked,
       (d) => d.path,

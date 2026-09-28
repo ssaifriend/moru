@@ -217,4 +217,6 @@ declare global {
   var __moruMetrics: typeof metrics | undefined
   // eslint-disable-next-line no-var
   var __moruProbePty: typeof probePty | undefined
+  // eslint-disable-next-line no-var
+  var __moruLastSaveDefault: string | null | undefined
 }

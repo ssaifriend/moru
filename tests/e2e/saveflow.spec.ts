@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp } from './launch'
@@ -65,4 +65,25 @@ test('closing a dirty tab asks first: cancel keeps it, save writes it', async ()
   await expect.poll(() => titles(save.page)).toEqual(['untitled'])
   expect(await save.page.evaluate(() => window.__moruTest!.doc())).toBe('')
   await save.app.close()
+})
+
+test('the save dialog for a new file starts in the open folder, and at the file for a saved one', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'moru-savedefault-'))
+  const existing = join(root, 'a.txt')
+  writeFileSync(existing, 'a\n')
+  const target = join(root, 'new.txt')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root, MORU_TEST_SAVE_PATH: target })
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.projectRoot())).toBe(root)
+  const asked = () => app.evaluate(() => globalThis.__moruLastSaveDefault)
+
+  await page.evaluate(() => window.__moruTest!.runCommand('file.new'))
+  await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
+  await expect.poll(() => titles(page)).toContain('new.txt')
+  expect(await asked()).toBe(root)
+
+  await page.evaluate((p) => window.__moruTest!.openPath(p), existing)
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.path())).toBe(existing)
+  await page.evaluate(() => window.__moruTest!.runCommand('file.saveAs'))
+  await expect.poll(asked).toBe(existing)
+  await app.close()
 })
