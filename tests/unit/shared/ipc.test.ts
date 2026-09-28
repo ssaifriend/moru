@@ -38,7 +38,8 @@ describe('ipc contracts', () => {
   it('index contracts', () => {
     expect(contracts['index.build'].request.safeParse({ root: '/p' }).success).toBe(true)
     expect(contracts['index.query'].response.safeParse({ ok: true, value: { items: [{ rel: 'a', path: '/p/a', positions: [0], score: 1 }] } }).success).toBe(true)
-    expect(pushContracts['index.changed'].safeParse({ files: 3 }).success).toBe(true)
+    expect(pushContracts['index.changed'].safeParse({ files: 3, dirs: ['/p/src'], full: false }).success).toBe(true)
+    expect(pushContracts['index.changed'].safeParse({ files: 3 }).success).toBe(false)
   })
 
   it('every push channel has a push contract', () => {
