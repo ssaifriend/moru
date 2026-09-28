@@ -62,3 +62,54 @@ test('terminal cwd is the project root', async () => {
     .toContain(root.replace('/private', ''))
   await app.close()
 })
+
+test('the folder context menu creates and renames through an inline name field', async () => {
+  const root = project()
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root })
+  const row = (name: string) => page.getByTestId('tree-row').filter({ hasText: name })
+
+  await row('src').click({ button: 'right' })
+  await page.getByTestId('popup-item').filter({ hasText: 'New File' }).click()
+  const input = page.getByTestId('tree-name-input')
+  await expect(input).toBeFocused()
+  await input.fill('fresh.ts')
+  await input.press('Enter')
+  await expect(row('fresh.ts')).toHaveCount(1)
+  expect(existsSync(join(root, 'src', 'fresh.ts'))).toBe(true)
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.path())).toBe(join(root, 'src', 'fresh.ts'))
+
+  await row('README.md').click({ button: 'right' })
+  await page.getByTestId('popup-item').filter({ hasText: 'Rename' }).click()
+  await expect(input).toHaveValue('README.md')
+  expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 6])
+  await input.fill('GUIDE.md')
+  await input.press('Enter')
+  await expect(row('GUIDE.md')).toHaveCount(1)
+  expect(existsSync(join(root, 'GUIDE.md'))).toBe(true)
+  expect(existsSync(join(root, 'README.md'))).toBe(false)
+
+  await row('GUIDE.md').click({ button: 'right' })
+  await page.getByTestId('popup-item').filter({ hasText: 'Rename' }).click()
+  await input.press('Escape')
+  await expect(input).toHaveCount(0)
+  await expect(row('GUIDE.md')).toHaveCount(1)
+  await app.close()
+})
+
+test('the sidebar keeps its width when a deep tree with long names is expanded', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'moru-wide-'))
+  const deep = join(root, 'a-very-long-directory-name-one', 'another-very-long-directory-name-two', 'yet-another-long-directory-name-three')
+  mkdirSync(deep, { recursive: true })
+  writeFileSync(join(deep, 'an-extremely-long-file-name-that-does-not-fit-in-the-sidebar-at-all.ts'), 'x\n')
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root })
+  const width = async () => Math.round((await page.getByTestId('sidebar').boundingBox())!.width)
+  const before = await width()
+
+  for (const name of ['a-very-long-directory-name-one', 'another-very-long-directory-name-two', 'yet-another-long-directory-name-three']) {
+    await page.getByTestId('tree-row').filter({ hasText: name }).click()
+  }
+  await expect(page.getByTestId('tree-row').filter({ hasText: 'an-extremely-long-file-name' })).toHaveCount(1)
+  expect(await width()).toBe(before)
+  expect(await page.evaluate(() => document.querySelector('.sidebar-tree')!.scrollWidth <= document.querySelector('.sidebar-tree')!.clientWidth + 1)).toBe(true)
+  await app.close()
+})

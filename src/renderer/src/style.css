@@ -331,6 +331,8 @@ body.tab-dragging * { cursor: grabbing !important; }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   background: var(--bar);
   position: relative;
 }
@@ -378,7 +380,19 @@ body.tab-dragging * { cursor: grabbing !important; }
 .tree-badge.long { font-size: 6.5px; letter-spacing: -0.04em; }
 .sidebar-gutter { flex: 0 0 6px; background: var(--bar); border-right: 1px solid var(--border); }
 .sidebar-gutter:hover, .sidebar-gutter:active, body.resizing-row .sidebar-gutter { background: color-mix(in srgb, var(--fg) 30%, var(--bar)); }
-.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tree-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--accent, #f9ae58);
+  border-radius: 3px;
+  outline: none;
+}
 
 .mod-held .cm-path-link { text-decoration: underline; cursor: pointer; }
 
