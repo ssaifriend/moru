@@ -121,6 +121,7 @@ export const App = () => {
     const uninstallModifiers = installModifierTracking(window)
     const offCommand = on('command.run', ({ id, args }) => void registry.run(id, args))
     const offCloseRequest = on('window.closeRequested', () => void ws.closeWindow())
+    const offTreeChange = on('index.changed', ({ dirs, full }) => ws.treeChanged(dirs, full))
     const uninstallDrop = installFileDrop(window, {
       pathOf: (file) => window.moru.pathForFile(file),
       onDrop: (paths, intoTerminal) => void ws.openDropped(paths, intoTerminal),
@@ -130,6 +131,7 @@ export const App = () => {
       uninstallModifiers()
       offCommand()
       offCloseRequest()
+      offTreeChange()
       uninstallDrop()
     })
 

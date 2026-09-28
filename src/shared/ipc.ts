@@ -203,7 +203,7 @@ export const pushContracts = {
   'pty.exit': z.object({ id: z.string(), exitCode: z.number() }),
   'fs.changed': z.object({ path: z.string(), hash: z.string(), mtimeMs: z.number() }),
   'fs.deleted': z.object({ path: z.string() }),
-  'index.changed': z.object({ files: z.number().int() }),
+  'index.changed': z.object({ files: z.number().int(), dirs: z.array(z.string()), full: z.boolean() }),
   'window.closeRequested': z.object({}),
   'search.batch': SearchBatch,
   'search.done': SearchDone,

@@ -237,6 +237,7 @@ export type Workspace = {
   readonly copyMarkdownHtml: (bufferId: BufferId | null) => Promise<void>
   readonly toggleSidebar: () => void
   readonly toggleWordWrap: () => void
+  readonly treeChanged: (dirs: readonly string[], full: boolean) => void
   readonly openDropped: (paths: readonly string[], intoTerminal: boolean) => Promise<void>
   readonly setSidebarWidth: (px: number) => void
   readonly revealInSidebar: (path: string) => Promise<void>
@@ -1265,6 +1266,47 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     await refreshDir(dir)
   }
 
+  const forgetDir = (dir: string): void =>
+    setState(
+      produce((s) => {
+        delete s.sidebar.entries[dir]
+        delete s.sidebar.expanded[dir]
+      }),
+    )
+
+  // changes made outside the app reach the tree through the index watcher; a burst costs one relisting
+  // per shown directory at most every 1.5 s, and a directory that vanished is dropped without a complaint
+  const treeRefreshMs = 1500
+  let pendingTreeDirs: readonly string[] = []
+  let pendingTreeFull = false
+  let treeRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+  const relistLoadedDirs = async (): Promise<void> => {
+    const loaded = Object.keys(state.sidebar.entries)
+    const targets = pendingTreeFull ? loaded : loaded.filter((dir) => pendingTreeDirs.includes(dir))
+    pendingTreeDirs = []
+    pendingTreeFull = false
+
+    await Promise.all(
+      targets.map(async (dir) => {
+        const stat = await invoke('fs.stat', { path: dir })
+        if (R.getWithDefault(stat, { kind: 'missing' as const }).kind === 'dir') await refreshDir(dir)
+        else forgetDir(dir)
+      }),
+    )
+  }
+
+  const treeChanged = (dirs: readonly string[], full: boolean): void => {
+    if (!state.projectRoot) return
+    pendingTreeFull = pendingTreeFull || full
+    pendingTreeDirs = A.uniq([...pendingTreeDirs, ...dirs])
+    if (treeRefreshTimer) return
+    treeRefreshTimer = setTimeout(() => {
+      treeRefreshTimer = null
+      void relistLoadedDirs()
+    }, treeRefreshMs)
+  }
+
   const collapseDir = (dir: string): void => {
     setState(
       produce((s) => {
@@ -2043,6 +2085,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     copyMarkdownHtml,
     toggleSidebar,
     toggleWordWrap,
+    treeChanged,
     openDropped,
     setSidebarWidth,
     revealInSidebar,

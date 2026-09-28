@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp } from './launch'
@@ -111,5 +111,29 @@ test('the sidebar keeps its width when a deep tree with long names is expanded',
   await expect(page.getByTestId('tree-row').filter({ hasText: 'an-extremely-long-file-name' })).toHaveCount(1)
   expect(await width()).toBe(before)
   expect(await page.evaluate(() => document.querySelector('.sidebar-tree')!.scrollWidth <= document.querySelector('.sidebar-tree')!.clientWidth + 1)).toBe(true)
+  await app.close()
+})
+
+test('files created, removed or added as folders outside the app show up in the tree', async () => {
+  const root = project()
+  const { app, page } = await launchApp({ MORU_TEST_ROOT: root })
+  const row = (name: string) => page.getByTestId('tree-row').filter({ hasText: name })
+  await row('src').click()
+  await expect(row('index.ts')).toHaveCount(1)
+
+  writeFileSync(join(root, 'src', 'outside.ts'), 'x\n')
+  writeFileSync(join(root, 'top.txt'), 'y\n')
+  mkdirSync(join(root, 'src', 'nested'))
+  await expect(row('outside.ts')).toHaveCount(1, { timeout: 15_000 })
+  await expect(row('top.txt')).toHaveCount(1, { timeout: 15_000 })
+  await expect(row('nested')).toHaveCount(1, { timeout: 15_000 })
+
+  rmSync(join(root, 'src', 'index.ts'))
+  await expect(row('index.ts')).toHaveCount(0, { timeout: 15_000 })
+
+  await row('nested').click()
+  rmSync(join(root, 'src', 'nested'), { recursive: true })
+  await expect(row('nested')).toHaveCount(0, { timeout: 15_000 })
+  await expect(page.getByTestId('status')).not.toContainText('folder failed')
   await app.close()
 })
