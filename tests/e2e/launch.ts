@@ -1,4 +1,5 @@
 import { _electron as electron, test, type ElectronApplication, type Page } from '@playwright/test'
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -6,6 +7,14 @@ import { join, resolve } from 'node:path'
 export type Launched = { readonly app: ElectronApplication; readonly page: Page; readonly userData: string }
 
 const launched = new Set<ElectronApplication>()
+
+// a hard kill must take the renderer, GPU and utility children with it: on Windows they would otherwise
+// outlive the main process holding the worker's stdio pipes, and the worker teardown would hang
+const killTree = (app: ElectronApplication): void => {
+  const pid = app.process().pid
+  if (process.platform === 'win32' && pid) spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+  else app.process().kill()
+}
 
 test.afterEach(async () => {
   const leaked = [...launched]
@@ -16,7 +25,7 @@ test.afterEach(async () => {
         app.close().catch(() => undefined),
         new Promise((r) => setTimeout(r, 5000)).then(() => {
           // a quit that hangs (seen on Windows CI with a live conpty) must not stall the worker
-          app.process().kill()
+          killTree(app)
         }),
       ]),
     ),
