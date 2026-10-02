@@ -60,6 +60,7 @@ export const WindowSnapshot = z.object({
   activePath: z.array(z.number().int().nonnegative()),
   findHistory: z.array(z.string()).optional(),
   recentFiles: z.array(z.string()).optional(),
+  recentlyClosed: z.array(BufferTabSnapshot).optional(),
 })
 export type WindowSnapshot = z.infer<typeof WindowSnapshot>
 

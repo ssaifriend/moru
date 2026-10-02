@@ -36,6 +36,7 @@ export const registerAppCommands = (registry: CommandRegistry, ws: Workspace, ui
     { id: 'file.save', title: 'File: Save', run: () => ws.save() },
     { id: 'file.saveAs', title: 'File: Save As…', run: () => ws.saveAs() },
     { id: 'tab.close', title: 'Tab: Close', run: () => ws.closeTab() },
+    { id: 'tab.reopenClosed', title: 'Tab: Reopen Closed Tab', run: () => ws.reopenClosedTab() },
     { id: 'tab.next', title: 'Tab: Next', run: () => ws.cycleTab(1) },
     { id: 'tab.prev', title: 'Tab: Previous', run: () => ws.cycleTab(-1) },
     { id: 'tab.select', title: 'Tab: Select by Index', run: (args) => ws.selectTabIndex(asIndex(args)) },

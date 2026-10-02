@@ -39,6 +39,7 @@ export const installMenu = (): void => {
         command('Save As…', 'file.saveAs', 'CmdOrCtrl+Shift+S'),
         { type: 'separator' },
         command('Close Tab', 'tab.close', 'CmdOrCtrl+W'),
+        command('Reopen Closed Tab', 'tab.reopenClosed', 'CmdOrCtrl+Shift+T'),
         ...(isMac ? [] : [{ type: 'separator' } as MenuItemConstructorOptions, { role: 'quit' } as MenuItemConstructorOptions]),
       ],
     },

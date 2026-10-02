@@ -168,6 +168,7 @@ export type Workspace = {
   readonly openFile: (path: string) => Promise<boolean>
   readonly newUntitled: () => void
   readonly closeTab: (tabId?: TabId) => Promise<void>
+  readonly reopenClosedTab: () => Promise<void>
   readonly closeWindow: () => Promise<void>
   readonly activateTab: (paneId: PaneId, tabId: TabId) => void
   readonly selectTabIndex: (n: number) => void
@@ -749,8 +750,35 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       }
     }
 
+    rememberClosed(buffers[tab.bufferId] ?? buffer)
     dropTab(tab.id)
     ensureOneTab()
+  }
+
+  // Cmd+Shift+T brings back file tabs closed on purpose, newest first, with their cursor, scroll and undo history
+  const closedLimit = 20
+  let recentlyClosed: readonly BufferTabSnapshot[] = []
+
+  const rememberClosed = (buffer: Buffer): void => {
+    if (buffer.meta === null) return
+    recentlyClosed = [bufferSnapshot(buffer), ...recentlyClosed].slice(0, closedLimit)
+  }
+
+  const reopenClosedTab = async (): Promise<void> => {
+    const [snap, ...rest] = recentlyClosed
+    if (!snap || snap.path === null) {
+      setState('status', 'no closed tab to reopen')
+      return
+    }
+    recentlyClosed = rest
+
+    const open = tabForPath(snap.path)
+    if (open) {
+      activateTab(open.paneId, open.tabId)
+      return
+    }
+    await restoreBufferTab(snap, undefined)
+    focusView(state.activePane)
   }
 
   // the window asked to close: settle every unsaved buffer first, then let main close it
@@ -1626,6 +1654,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     activePath: pathToLeaf(currentTree, state.activePane) ?? [],
     findHistory: [...state.find.history],
     recentFiles: [...state.mru],
+    recentlyClosed: [...recentlyClosed],
   })
 
   const treeFromSnapshot = (snap: PaneSnapshot): { tree: PaneNode; leaves: { id: PaneId; snap: LeafSnapshot }[] } => {
@@ -1723,6 +1752,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     if (snap.sidebar.width) setSidebarWidth(snap.sidebar.width)
     if (snap.findHistory) setState('find', 'history', [...snap.findHistory])
     if (snap.recentFiles) setState('mru', [...snap.recentFiles])
+    if (snap.recentlyClosed) recentlyClosed = snap.recentlyClosed.slice(0, closedLimit)
     for (const dir of snap.sidebar.expanded) await expandDir(dir)
 
     const targetLeaf = leafAtPath(currentTree, snap.activePath) ?? leaves(currentTree)[0]
@@ -2016,6 +2046,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     openFile,
     newUntitled,
     closeTab,
+    reopenClosedTab,
     closeWindow,
     activateTab,
     selectTabIndex,

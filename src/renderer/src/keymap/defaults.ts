@@ -10,6 +10,7 @@ const common: readonly Binding[] = [
   { keys: 'mod+s', command: 'file.save' },
   { keys: 'mod+shift+s', command: 'file.saveAs' },
   { keys: 'mod+w', command: 'tab.close' },
+  { keys: 'mod+shift+t', command: 'tab.reopenClosed' },
   { keys: 'mod+shift+p', command: 'palette.commands' },
   { keys: 'mod+p', command: 'palette.goto' },
   { keys: 'mod+r', command: 'palette.gotoSymbol' },
