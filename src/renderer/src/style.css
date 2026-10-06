@@ -439,7 +439,18 @@ body.tab-dragging * { cursor: grabbing !important; }
 .find-toggle.on { background: var(--selection); }
 .find-count { min-width: 64px; text-align: right; opacity: 0.8; white-space: nowrap; }
 
-.cm-panels { display: none; }
+/* CodeMirror's own search panel stays mounted (its open state drives match highlighting) but takes no
+   room. display:none would park it at (0,0), and the panels plugin would then report a bottom scroll
+   margin the size of the editor, scrolling the cursor "into view" by that much on the first edit. */
+.editor-host .cm-editor .cm-panels,
+.editor-host .cm-editor .cm-panels-bottom,
+.editor-host .cm-editor .cm-panels-top {
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
 
 .tab.preview .tab-title { font-style: italic; opacity: 0.8; }
 .palette-item.hint { opacity: 0.6; font-style: italic; }

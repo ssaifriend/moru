@@ -17,6 +17,7 @@ export type PaneInfo = { paneId: string; active: boolean; tabs: TabInfo[] }
 
 export type MoruTestHooks = {
   doc(): string
+  editorView(): unknown
   selections(): { from: number; to: number }[]
   composing(): boolean
   focus(): void
@@ -83,6 +84,7 @@ export const installTestHooks = (
 
   window.__moruTest = {
     doc: () => view().state.doc.toString(),
+    editorView: () => view(),
     selections: () => view().state.selection.ranges.map((r) => ({ from: r.from, to: r.to })),
     composing: () => view().composing,
     focus: () => view().focus(),
